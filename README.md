@@ -5,9 +5,9 @@ Sistema de Gestão de Estoque, Controle Patrimonial com Números Individuais de 
 ---
 
 ## 🔒 Segurança e Acesso Restrito
-Este site é **fechado ao público** e protegido por tela de autenticação exclusiva:
-- **Usuário**: Administrador
-- **Senha Master**: `RfuC@21051963`
+Este site é **fechado ao público** e protegido por tela de autenticação exclusiva e controle de acesso por usuários.
+- **Administrador**: `admin`
+- Acesso restrito a usuários autorizados.
 
 ---
 
