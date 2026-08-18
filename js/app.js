@@ -785,6 +785,52 @@ function updateUserSidebarUI(user) {
   }
 }
 
+function isAdmin() {
+  const user = getCurrentUser();
+  return user && (user.role === 'admin' || user.username === 'admin');
+}
+
+function applyPermissionVisibility() {
+  const admin = isAdmin();
+
+  // 1. Header quick actions
+  const quickTransaction = document.getElementById('btn-quick-transaction');
+  const quickAddProd = document.getElementById('btn-quick-add-product');
+  if (quickTransaction) quickTransaction.style.display = admin ? 'inline-flex' : 'none';
+  if (quickAddProd) quickAddProd.style.display = admin ? 'inline-flex' : 'none';
+
+  // 2. Sidebar users tab (only admins see and manage users)
+  const usersTab = document.getElementById('nav-btn-users');
+  if (usersTab && usersTab.parentElement) {
+    usersTab.parentElement.style.display = admin ? 'block' : 'none';
+  }
+
+  // 3. Admin-only buttons
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = admin ? '' : 'none';
+  });
+
+  // 4. Header Read-Only Badge
+  let readonlyBanner = document.getElementById('readonly-mode-banner');
+  const header = document.querySelector('.top-header');
+  if (!admin) {
+    if (!readonlyBanner && header) {
+      readonlyBanner = document.createElement('div');
+      readonlyBanner.id = 'readonly-mode-banner';
+      readonlyBanner.style.cssText = 'background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.35); color: #38bdf8; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.4rem; font-weight: 500;';
+      readonlyBanner.innerHTML = '👁️ <span>Modo Consulta (Somente Leitura)</span>';
+      const actions = header.querySelector('.header-actions');
+      if (actions) {
+        header.insertBefore(readonlyBanner, actions);
+      } else {
+        header.appendChild(readonlyBanner);
+      }
+    }
+  } else {
+    if (readonlyBanner) readonlyBanner.remove();
+  }
+}
+
 function checkAuthentication() {
   const user = getCurrentUser();
   const isAuth = !!user;
@@ -795,6 +841,7 @@ function checkAuthentication() {
     if (authScreen) authScreen.style.display = 'none';
     if (appContainer) appContainer.style.display = 'flex';
     updateUserSidebarUI(user);
+    applyPermissionVisibility();
     return true;
   } else {
     if (authScreen) authScreen.style.display = 'flex';
@@ -909,6 +956,12 @@ function setupNavigation() {
       const tabTarget = btn.getAttribute('data-tab');
       if (!tabTarget) return;
 
+      // Block non-admin from opening users tab
+      if (tabTarget === 'users' && !isAdmin()) {
+        showToast('🔒 Acesso restrito: Somente administradores podem gerenciar usuários.', 'warning');
+        return;
+      }
+
       document.querySelectorAll('.nav-item').forEach(li => li.classList.remove('active'));
       btn.parentElement.classList.add('active');
 
@@ -926,6 +979,7 @@ function setupNavigation() {
 
 function renderApp() {
   updateGlobalStats();
+  applyPermissionVisibility();
   
   if (state.currentTab === 'dashboard') {
     renderDashboard();
@@ -938,7 +992,12 @@ function renderApp() {
   } else if (state.currentTab === 'reports') {
     renderReportsView();
   } else if (state.currentTab === 'users') {
-    renderUsersView();
+    if (isAdmin()) {
+      renderUsersView();
+    } else {
+      state.currentTab = 'dashboard';
+      renderDashboard();
+    }
   }
 
   setTimeout(initIcons, 50);
@@ -1008,9 +1067,15 @@ function renderDashboard() {
               </span>
             </td>
             <td>
-              <button class="btn btn-sm btn-primary" onclick="window.openTransactionModalFor('${p.id}', 'IN')">
-                <i data-lucide="plus"></i> Repor Estoque
-              </button>
+              ${isAdmin() ? `
+                <button class="btn btn-sm btn-primary" onclick="window.openTransactionModalFor('${p.id}', 'IN')">
+                  <i data-lucide="plus"></i> Repor Estoque
+                </button>
+              ` : `
+                <span style="font-size: 0.75rem; color: var(--warning); font-weight: 500;">
+                  ⚠️ Reposição Necessária
+                </span>
+              `}
             </td>
           </tr>
         `;
@@ -1183,20 +1248,26 @@ function renderInventoryTable() {
             <td><strong>${formatCurrency(totalVal)}</strong></td>
             <td><span style="font-size: 0.775rem; color: var(--text-dark);">${p.location || 'N/D'}</span></td>
             <td>
-              <div style="display: flex; gap: 0.35rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'IN')" title="Dar Entrada">
-                  <i data-lucide="plus-circle"></i>
-                </button>
-                <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'OUT')" title="Registrar Saída">
-                  <i data-lucide="minus-circle"></i>
-                </button>
-                <button class="btn btn-sm btn-secondary" onclick="window.openEditProductModal('${p.id}')" title="Editar Produto">
-                  <i data-lucide="edit-3"></i>
-                </button>
-                <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteProduct('${p.id}')" title="Excluir" style="color: var(--danger);">
-                  <i data-lucide="trash-2"></i>
-                </button>
-              </div>
+              ${isAdmin() ? `
+                <div style="display: flex; gap: 0.35rem;">
+                  <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'IN')" title="Dar Entrada">
+                    <i data-lucide="plus-circle"></i>
+                  </button>
+                  <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'OUT')" title="Registrar Saída">
+                    <i data-lucide="minus-circle"></i>
+                  </button>
+                  <button class="btn btn-sm btn-secondary" onclick="window.openEditProductModal('${p.id}')" title="Editar Produto">
+                    <i data-lucide="edit-3"></i>
+                  </button>
+                  <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteProduct('${p.id}')" title="Excluir" style="color: var(--danger);">
+                    <i data-lucide="trash-2"></i>
+                  </button>
+                </div>
+              ` : `
+                <span style="font-size: 0.75rem; color: var(--text-muted);">
+                  <i data-lucide="lock" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Somente Consulta
+                </span>
+              `}
             </td>
           </tr>
         `;
@@ -1242,10 +1313,14 @@ function renderTransactionsTable() {
               <div style="font-size: 0.725rem; color: var(--text-dark);">${formatDate(t.timestamp)}</div>
             </td>
             <td>
-              <div style="display: flex; gap: 0.25rem;">
-                <button class="btn btn-sm btn-secondary" onclick="window.openEditTransactionModal('${t.id}')" title="Editar Movimentação"><i data-lucide="edit-3"></i> Editar</button>
-                <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteTransaction('${t.id}')" title="Excluir Lançamento" style="color: var(--danger);"><i data-lucide="trash-2"></i> Excluir</button>
-              </div>
+              ${isAdmin() ? `
+                <div style="display: flex; gap: 0.25rem;">
+                  <button class="btn btn-sm btn-secondary" onclick="window.openEditTransactionModal('${t.id}')" title="Editar Movimentação"><i data-lucide="edit-3"></i> Editar</button>
+                  <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteTransaction('${t.id}')" title="Excluir Lançamento" style="color: var(--danger);"><i data-lucide="trash-2"></i> Excluir</button>
+                </div>
+              ` : `
+                <span style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="check" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Registrado</span>
+              `}
             </td>
           </tr>
         `;
@@ -1361,12 +1436,16 @@ function renderCategoriesView() {
               <td>${formatCurrency(p.unitPrice)}</td>
               <td><strong>${formatCurrency(p.quantity * p.unitPrice)}</strong></td>
               <td>
-                <div style="display: flex; gap: 0.25rem;">
-                  <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'IN')" title="Repor (+)"><i data-lucide="plus-circle"></i> Repor</button>
-                  <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'OUT')" title="Baixa (-)"><i data-lucide="minus-circle"></i> Baixa</button>
-                  <button class="btn btn-sm btn-secondary" onclick="window.openEditProductModal('${p.id}')" title="Editar"><i data-lucide="edit-3"></i></button>
-                  <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteProduct('${p.id}')" title="Excluir" style="color: var(--danger);"><i data-lucide="trash-2"></i></button>
-                </div>
+                ${isAdmin() ? `
+                  <div style="display: flex; gap: 0.25rem;">
+                    <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'IN')" title="Repor (+)"><i data-lucide="plus-circle"></i> Repor</button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.openTransactionModalFor('${p.id}', 'OUT')" title="Baixa (-)"><i data-lucide="minus-circle"></i> Baixa</button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.openEditProductModal('${p.id}')" title="Editar"><i data-lucide="edit-3"></i></button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteProduct('${p.id}')" title="Excluir" style="color: var(--danger);"><i data-lucide="trash-2"></i></button>
+                  </div>
+                ` : `
+                  <span style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="lock" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Somente Consulta</span>
+                `}
               </td>
             </tr>
           `).join('');
@@ -1389,9 +1468,11 @@ function renderCategoriesView() {
                 <button class="btn btn-sm btn-secondary" onclick="window.filterInventoryByCategory('${cat.name}')" title="Abrir no Catálogo Geral">
                   📋 Ver no Inventário
                 </button>
-                <button class="btn btn-sm btn-primary" onclick="window.openAddProductModal()" title="Cadastrar Produto">
-                  <i data-lucide="plus"></i> Adicionar Item
-                </button>
+                ${isAdmin() ? `
+                  <button class="btn btn-sm btn-primary" onclick="window.openAddProductModal()" title="Cadastrar Produto">
+                    <i data-lucide="plus"></i> Adicionar Item
+                  </button>
+                ` : ''}
               </div>
             </div>
             <div class="table-container" style="margin-bottom: 0;">
@@ -1632,6 +1713,10 @@ window.switchProductModalTab = function(tabName) {
 
 /* Modal Window Methods attached to window for direct HTML onclick binding */
 window.openAddProductModal = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem cadastrar produtos.', 'danger');
+    return;
+  }
   state.editingProductId = null;
   const modal = document.getElementById('product-modal');
   const title = document.getElementById('product-modal-title');
@@ -1657,6 +1742,10 @@ window.openAddProductModal = function() {
 };
 
 window.openEditProductModal = function(productId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem editar produtos.', 'danger');
+    return;
+  }
   const product = getProductById(productId);
   if (!product) return;
 
@@ -1690,18 +1779,23 @@ window.openEditProductModal = function(productId) {
   if (modal) modal.classList.add('active');
 };
 
-window.closeProductModal = function() {
+function closeProductModal() {
   const modal = document.getElementById('product-modal');
   if (modal) modal.classList.remove('active');
-};
+  state.editingProductId = null;
+}
 
 function saveProductFromForm() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem salvar alterações.', 'danger');
+    return;
+  }
   const sku = document.getElementById('product-sku').value.trim();
   const name = document.getElementById('product-name').value.trim();
   const category = document.getElementById('product-category').value;
-  const quantity = Number(document.getElementById('product-quantity').value);
-  const minQuantity = Number(document.getElementById('product-min-quantity').value);
-  const unitPrice = Number(document.getElementById('product-price').value);
+  const quantity = parseInt(document.getElementById('product-quantity').value, 10) || 0;
+  const minQuantity = parseInt(document.getElementById('product-min-quantity').value, 10) || 0;
+  const unitPrice = parseFloat(document.getElementById('product-price').value) || 0;
   const supplier = document.getElementById('product-supplier').value;
   const location = document.getElementById('product-location').value.trim();
   const icon = document.getElementById('product-icon').value.trim() || '📦';
@@ -1711,7 +1805,7 @@ function saveProductFromForm() {
   const nfSeries = document.getElementById('product-nf-series').value.trim();
   const nfKey = document.getElementById('product-nf-key').value.trim();
   const nfDate = document.getElementById('product-nf-date').value;
-  const nfTotal = Number(document.getElementById('product-nf-total').value) || 0;
+  const nfTotal = parseFloat(document.getElementById('product-nf-total').value) || 0;
   const nfCnpj = document.getElementById('product-nf-cnpj').value.trim();
   const nfLink = document.getElementById('product-nf-link').value.trim();
   const nfNotes = document.getElementById('product-nf-notes').value.trim();
@@ -1749,12 +1843,20 @@ function saveProductFromForm() {
 }
 
 window.openTransactionModal = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem registrar movimentações.', 'danger');
+    return;
+  }
   populateProductSelectForTransaction();
   const modal = document.getElementById('transaction-modal');
   if (modal) modal.classList.add('active');
 };
 
 window.openTransactionModalFor = function(productId, type = 'IN') {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem alterar estoque.', 'danger');
+    return;
+  }
   populateProductSelectForTransaction(productId);
   document.getElementById('tx-type').value = type;
   const modal = document.getElementById('transaction-modal');
@@ -1880,6 +1982,10 @@ function saveEditTransactionFromForm() {
 }
 
 window.confirmDeleteTransaction = function(txId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem excluir movimentações.', 'danger');
+    return;
+  }
   const transactions = getTransactions();
   const tx = transactions.find(t => t.id === txId);
   if (!tx) return;
@@ -1907,6 +2013,10 @@ window.confirmDeleteTransaction = function(txId) {
 };
 
 window.confirmDeleteProduct = function(productId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem excluir produtos.', 'danger');
+    return;
+  }
   const product = getProductById(productId);
   if (!product) return;
 
@@ -1919,6 +2029,10 @@ window.confirmDeleteProduct = function(productId) {
 
 /* --- SUPPLIER MODAL & ACTION HANDLERS --- */
 window.openAddSupplierModal = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem cadastrar fornecedores.', 'danger');
+    return;
+  }
   const modal = document.getElementById('supplier-modal');
   const form = document.getElementById('supplier-form');
   if (form) form.reset();
@@ -1931,6 +2045,10 @@ window.closeSupplierModal = function() {
 };
 
 function saveSupplierFromForm() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem salvar fornecedores.', 'danger');
+    return;
+  }
   const name = document.getElementById('supplier-name').value.trim();
   const contactPerson = document.getElementById('supplier-contact').value.trim();
   const email = document.getElementById('supplier-email').value.trim();
@@ -1949,6 +2067,10 @@ function saveSupplierFromForm() {
 }
 
 window.confirmDeleteSupplier = function(supplierId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem excluir fornecedores.', 'danger');
+    return;
+  }
   const suppliers = getSuppliers();
   const supplier = suppliers.find(s => s.id === supplierId);
   if (!supplier) return;
@@ -1963,6 +2085,10 @@ window.confirmDeleteSupplier = function(supplierId) {
 
 /* --- IMPORT & EXPORT (EXCEL .XLSX / .XLS / .CSV FILES) --- */
 window.triggerImportFile = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem importar planilhas.', 'danger');
+    return;
+  }
   const fileInput = document.getElementById('file-import-input');
   if (fileInput) {
     fileInput.value = '';
@@ -1971,6 +2097,10 @@ window.triggerImportFile = function() {
 };
 
 window.handleImportFile = function(event) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem importar dados.', 'danger');
+    return;
+  }
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
@@ -2299,6 +2429,10 @@ window.printCurrentView = function() {
 
 /* Clear Activity / Transactions History Handler */
 window.clearActivityHistory = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem apagar o histórico de atividades.', 'danger');
+    return;
+  }
   const transactions = getTransactions();
   if (transactions.length === 0) {
     showToast('O histórico de atividades já está vazio.', 'info');
@@ -2613,6 +2747,10 @@ window.renderUsersTable = function() {
 };
 
 window.openAddUserModal = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem cadastrar usuários.', 'danger');
+    return;
+  }
   state.editingUserId = null;
   const modal = document.getElementById('user-modal');
   const title = document.getElementById('user-modal-title');
@@ -2634,6 +2772,10 @@ window.openAddUserModal = function() {
 };
 
 window.openEditUserModal = function(userId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem editar usuários.', 'danger');
+    return;
+  }
   const user = getUserById(userId);
   if (!user) return;
 
@@ -2673,6 +2815,10 @@ window.closeUserModal = function() {
 
 window.handleUserFormSubmit = function(e) {
   if (e) e.preventDefault();
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem cadastrar ou editar usuários.', 'danger');
+    return;
+  }
 
   const editId = document.getElementById('user-edit-id').value;
   const name = document.getElementById('user-fullname').value.trim();
@@ -2760,6 +2906,10 @@ window.handleUserFormSubmit = function(e) {
 };
 
 window.openChangeUserPasswordModal = function(userId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem redefinir senhas de terceiros.', 'danger');
+    return;
+  }
   const user = getUserById(userId);
   if (!user) return;
 
@@ -2783,6 +2933,10 @@ window.closeChangePwdModal = function() {
 
 window.handleChangePwdSubmit = function(e) {
   if (e) e.preventDefault();
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem alterar senhas de outros usuários.', 'danger');
+    return;
+  }
   const userId = document.getElementById('change-pwd-user-id').value;
   const newPwd = document.getElementById('new-user-pwd').value;
   const newPwdConfirm = document.getElementById('new-user-pwd-confirm').value;
@@ -2809,6 +2963,10 @@ window.handleChangePwdSubmit = function(e) {
 };
 
 window.deleteUser = function(userId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem excluir usuários.', 'danger');
+    return;
+  }
   const user = getUserById(userId);
   if (!user) return;
 
