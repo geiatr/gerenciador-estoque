@@ -334,7 +334,8 @@ const STORAGE_KEYS = {
   SUPPLIERS: 'stockmaster_suppliers_v8',
   TRANSACTIONS: 'stockmaster_transactions_v8',
   USERS: 'stockmaster_users_v1',
-  CURRENT_USER: 'stockmaster_current_user_v1'
+  CURRENT_USER: 'stockmaster_current_user_v1',
+  ONLINE_SESSIONS: 'stockmaster_online_sessions_v2'
 };
 
 function ensureInventoryCodes(products) {
@@ -776,9 +777,11 @@ function setCurrentUser(user) {
     sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(safeUser));
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(safeUser));
     updateUserSidebarUI(safeUser);
+    updateOnlineHeartbeat();
   } else {
     sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    removeCurrentOnlineSession();
   }
 }
 
@@ -799,6 +802,206 @@ function updateUserSidebarUI(user) {
     avatarEl.textContent = initials;
   }
 }
+
+/* --------------------------------------------------------------------------
+   ONLINE USERS TRACKING & REAL-TIME SESSIONS ENGINE
+   -------------------------------------------------------------------------- */
+function getOnlineSessions() {
+  const data = localStorage.getItem(STORAGE_KEYS.ONLINE_SESSIONS);
+  if (!data) return [];
+  try {
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return [];
+    const now = Date.now();
+    // Keep active sessions with activity in the last 60 seconds
+    return parsed.filter(s => s && s.username && (now - Number(s.lastSeen || 0)) < 60000);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveOnlineSessions(sessions) {
+  localStorage.setItem(STORAGE_KEYS.ONLINE_SESSIONS, JSON.stringify(sessions));
+}
+
+function updateOnlineHeartbeat() {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    updateOnlineUI([]);
+    return;
+  }
+
+  let tabId = sessionStorage.getItem('stockmaster_tab_id');
+  if (!tabId) {
+    tabId = 'tab_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    sessionStorage.setItem('stockmaster_tab_id', tabId);
+  }
+
+  let loginTime = sessionStorage.getItem('stockmaster_login_time');
+  if (!loginTime) {
+    loginTime = new Date().toISOString();
+    sessionStorage.setItem('stockmaster_login_time', loginTime);
+  }
+
+  const sessions = getOnlineSessions();
+  const now = Date.now();
+
+  const tabNames = {
+    dashboard: '📊 Visão Geral (Dashboard)',
+    inventory: '📦 Catálogo de Inventário',
+    transactions: '🔄 Histórico de Movimentações',
+    categories: '📁 Categorias & Fornecedores',
+    reports: '📈 Relatórios Gerenciais',
+    users: '👥 Gestão de Usuários'
+  };
+
+  const currentTabName = tabNames[state.currentTab] || 'Navegando no Sistema';
+
+  const existingIdx = sessions.findIndex(s => s.tabId === tabId || (s.username === currentUser.username && s.tabId === tabId));
+  const currentRecord = {
+    tabId: tabId,
+    id: currentUser.id,
+    username: currentUser.username,
+    name: currentUser.name,
+    role: currentUser.role,
+    currentTab: state.currentTab,
+    currentTabName: currentTabName,
+    lastSeen: now,
+    loginTime: loginTime
+  };
+
+  if (existingIdx !== -1) {
+    sessions[existingIdx] = currentRecord;
+  } else {
+    sessions.push(currentRecord);
+  }
+
+  saveOnlineSessions(sessions);
+  updateOnlineUI(sessions);
+}
+
+function removeCurrentOnlineSession() {
+  const tabId = sessionStorage.getItem('stockmaster_tab_id');
+  if (!tabId) return;
+  const sessions = getOnlineSessions().filter(s => s.tabId !== tabId);
+  saveOnlineSessions(sessions);
+  updateOnlineUI(sessions);
+}
+
+function updateOnlineUI(sessions) {
+  const activeSessions = sessions || getOnlineSessions();
+  const uniqueUsernames = new Set(activeSessions.map(s => s.username.toLowerCase()));
+  const count = uniqueUsernames.size || (getCurrentUser() ? 1 : 0);
+
+  // Top header badge
+  const badgeEl = document.getElementById('online-users-count-badge');
+  if (badgeEl) {
+    badgeEl.textContent = `${count} Online`;
+  }
+
+  // Users view stat card
+  const statOnlineEl = document.getElementById('stat-online-users');
+  if (statOnlineEl) {
+    statOnlineEl.textContent = count;
+  }
+
+  // Re-render modal if open
+  const modal = document.getElementById('online-users-modal');
+  if (modal && modal.classList.contains('active')) {
+    window.renderOnlineUsersList();
+  }
+}
+
+window.openOnlineUsersModal = function() {
+  updateOnlineHeartbeat();
+  const modal = document.getElementById('online-users-modal');
+  if (modal) {
+    window.renderOnlineUsersList();
+    modal.classList.add('active');
+  }
+  setTimeout(initIcons, 50);
+};
+
+window.closeOnlineUsersModal = function() {
+  const modal = document.getElementById('online-users-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.renderOnlineUsersList = function() {
+  const sessions = getOnlineSessions();
+  const container = document.getElementById('online-users-list-container');
+  const subtitle = document.getElementById('online-users-modal-subtitle');
+  if (!container) return;
+
+  // Deduplicate by username keeping newest timestamp
+  const userMap = new Map();
+  sessions.forEach(s => {
+    const key = (s.username || '').toLowerCase();
+    if (!userMap.has(key) || userMap.get(key).lastSeen < s.lastSeen) {
+      userMap.set(key, s);
+    }
+  });
+
+  const uniqueList = Array.from(userMap.values());
+  const currentUser = getCurrentUser();
+
+  if (subtitle) {
+    subtitle.textContent = `${uniqueList.length} ${uniqueList.length === 1 ? 'usuário conectado' : 'usuários conectados'} em tempo real`;
+  }
+
+  if (uniqueList.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+        Nenhum usuário detectado online no momento.
+      </div>
+    `;
+    return;
+  }
+
+  const roleLabels = {
+    admin: '<span style="color: #fbbf24; font-weight: 600; font-size: 0.75rem;">🛡️ Administrador</span>',
+    operator: '<span style="color: #34d399; font-weight: 600; font-size: 0.75rem;">📦 Operador</span>',
+    viewer: '<span style="color: #38bdf8; font-weight: 600; font-size: 0.75rem;">👁️ Modo Consulta</span>'
+  };
+
+  container.innerHTML = uniqueList.map(s => {
+    const parts = (s.name || '').trim().split(' ');
+    const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'US').slice(0, 2).toUpperCase();
+    const isMe = currentUser && (currentUser.username || '').toLowerCase() === (s.username || '').toLowerCase();
+    const loginDate = s.loginTime ? new Date(s.loginTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Agora';
+
+    return `
+      <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.85rem;">
+          <div style="position: relative;">
+            <div class="avatar" style="width: 40px; height: 40px; font-size: 0.9rem; background: var(--bg-card); border: 1px solid var(--border);">${initials}</div>
+            <span style="position: absolute; bottom: 0; right: 0; width: 11px; height: 11px; border-radius: 50%; background: #10b981; border: 2px solid #0f172a; box-shadow: 0 0 6px #10b981;"></span>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <strong style="color: var(--text-main); font-size: 0.925rem;">${s.name}</strong>
+              ${isMe ? '<span class="badge" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8; font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);">Você</span>' : ''}
+            </div>
+            <div style="font-size: 0.775rem; color: var(--text-muted); margin-top: 0.15rem;">
+              <code>@${s.username}</code> • ${roleLabels[s.role] || s.role}
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: right; font-size: 0.75rem;">
+          <div style="color: var(--primary); font-weight: 500; margin-bottom: 0.15rem;">
+            ${s.currentTabName || 'Navegando'}
+          </div>
+          <div style="color: var(--text-dark);">
+            🟢 Ativo desde ${loginDate}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  setTimeout(initIcons, 50);
+};
 
 function isAdmin() {
   const user = getCurrentUser();
@@ -1051,7 +1254,13 @@ document.addEventListener('DOMContentLoaded', () => {
   
   if (checkAuthentication()) {
     renderApp();
+    updateOnlineHeartbeat();
   }
+
+  // Real-time online heartbeat cycle (every 15 seconds)
+  setInterval(updateOnlineHeartbeat, 15000);
+  window.addEventListener('beforeunload', removeCurrentOnlineSession);
+  window.addEventListener('focus', updateOnlineHeartbeat);
 });
 
 function initIcons() {
@@ -2783,13 +2992,17 @@ window.printInvTagsLabels = function() {
    -------------------------------------------------------------------------- */
 function renderUsersView() {
   const users = getUsers();
+  const onlineSessions = getOnlineSessions();
+  const onlineUsernames = new Set(onlineSessions.map(s => (s.username || '').toLowerCase()));
   
   const totalEl = document.getElementById('stat-total-users');
+  const onlineEl = document.getElementById('stat-online-users');
   const adminEl = document.getElementById('stat-admin-users');
   const opEl = document.getElementById('stat-operator-users');
   const viewEl = document.getElementById('stat-viewer-users');
 
   if (totalEl) totalEl.textContent = users.length;
+  if (onlineEl) onlineEl.textContent = onlineUsernames.size || (getCurrentUser() ? 1 : 0);
   if (adminEl) adminEl.textContent = users.filter(u => u.role === 'admin').length;
   if (opEl) opEl.textContent = users.filter(u => u.role === 'operator').length;
   if (viewEl) viewEl.textContent = users.filter(u => u.role === 'viewer').length;
@@ -2799,6 +3012,9 @@ function renderUsersView() {
 
 window.renderUsersTable = function() {
   const users = getUsers();
+  const onlineSessions = getOnlineSessions();
+  const onlineUsernames = new Set(onlineSessions.map(s => (s.username || '').toLowerCase()));
+
   const searchInput = document.getElementById('users-search-input');
   const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
   const tbody = document.getElementById('users-tbody');
@@ -2814,32 +3030,36 @@ window.renderUsersTable = function() {
   const roleLabels = {
     admin: '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">🛡️ Administrador</span>',
     operator: '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">📦 Operador</span>',
-    viewer: '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">👁️ Visualizador</span>'
-  };
-
-  const statusLabels = {
-    active: '<span class="badge badge-success" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"><span class="badge-dot" style="background:#10b981;display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;"></span> Ativo</span>',
-    inactive: '<span class="badge badge-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"><span class="badge-dot" style="background:#ef4444;display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;"></span> Inativo</span>'
+    viewer: '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">👁️ Modo Consulta</span>'
   };
 
   tbody.innerHTML = filtered.map(u => {
     const parts = (u.name || '').trim().split(' ');
     const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'US').slice(0, 2).toUpperCase();
     const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-';
+    const isOnline = onlineUsernames.has((u.username || '').toLowerCase());
+
+    const onlineStatusHtml = isOnline
+      ? '<span style="display: inline-flex; align-items: center; gap: 0.35rem; color: #34d399; font-size: 0.75rem; font-weight: 600; background: rgba(16, 185, 129, 0.15); padding: 0.18rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.3);"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span> 🟢 Online Agora</span>'
+      : '<span style="color: var(--text-muted); font-size: 0.75rem;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#64748b;margin-right:4px;"></span> Desconectado</span>';
 
     return `
       <tr>
         <td>
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div class="avatar" style="width: 34px; height: 34px; font-size: 0.8rem; background: var(--bg-card); border: 1px solid var(--border);">${initials}</div>
+            <div style="position: relative;">
+              <div class="avatar" style="width: 36px; height: 36px; font-size: 0.8rem; background: var(--bg-card); border: 1px solid var(--border);">${initials}</div>
+              ${isOnline ? '<span style="position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 2px solid #0f172a; box-shadow: 0 0 5px #10b981;"></span>' : ''}
+            </div>
             <div>
               <strong style="color: var(--text-main); font-size: 0.9rem;">${u.name}</strong>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id}</div>
             </div>
           </div>
         </td>
         <td><code>@${u.username}</code></td>
         <td>${roleLabels[u.role] || u.role}</td>
-        <td>${statusLabels[u.status] || u.status}</td>
+        <td>${onlineStatusHtml}</td>
         <td style="color: var(--text-muted); font-size: 0.85rem;">${createdStr}</td>
         <td style="text-align: right;">
           <div style="display: inline-flex; gap: 0.35rem;">
