@@ -332,7 +332,9 @@ const STORAGE_KEYS = {
   PRODUCTS: 'stockmaster_products_v8',
   CATEGORIES: 'stockmaster_categories_v8',
   SUPPLIERS: 'stockmaster_suppliers_v8',
-  TRANSACTIONS: 'stockmaster_transactions_v8'
+  TRANSACTIONS: 'stockmaster_transactions_v8',
+  USERS: 'stockmaster_users_v1',
+  CURRENT_USER: 'stockmaster_current_user_v1'
 };
 
 function ensureInventoryCodes(products) {
@@ -541,6 +543,51 @@ function deleteSupplier(id) {
   localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(filtered));
 }
 
+const INITIAL_USERS = [
+  {
+    id: 'usr_admin',
+    name: 'Administrador',
+    username: 'admin',
+    password: 'RfuC@21051963',
+    role: 'admin',
+    status: 'active',
+    createdAt: '2026-08-18T10:00:00.000Z'
+  }
+];
+
+function getUsers() {
+  const data = localStorage.getItem(STORAGE_KEYS.USERS);
+  if (!data) {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+    return INITIAL_USERS;
+  }
+  try {
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+      return INITIAL_USERS;
+    }
+    return parsed;
+  } catch (e) {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+    return INITIAL_USERS;
+  }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+}
+
+function getUserById(id) {
+  return getUsers().find(u => u.id === id);
+}
+
+function getUserByUsername(username) {
+  if (!username) return null;
+  const clean = username.trim().toLowerCase();
+  return getUsers().find(u => u.username.toLowerCase() === clean);
+}
+
 function getInventoryStats() {
   const products = getProducts();
 
@@ -700,14 +747,54 @@ const AUTH_CONFIG = {
   STORAGE_KEY: 'stockmaster_authenticated_v1'
 };
 
+function getCurrentUser() {
+  const sessionData = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+  if (sessionData) {
+    try { return JSON.parse(sessionData); } catch (e) { return null; }
+  }
+  return null;
+}
+
+function setCurrentUser(user) {
+  if (user) {
+    const safeUser = { id: user.id, name: user.name, username: user.username, role: user.role, status: user.status };
+    sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(safeUser));
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(safeUser));
+    updateUserSidebarUI(safeUser);
+  } else {
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  }
+}
+
+function updateUserSidebarUI(user) {
+  if (!user) return;
+  const nameEl = document.getElementById('current-user-name');
+  const roleEl = document.getElementById('current-user-role');
+  const avatarEl = document.getElementById('current-user-avatar');
+
+  if (nameEl) nameEl.textContent = user.name;
+  if (roleEl) {
+    const roleMap = { admin: 'Administrador', operator: 'Operador de Estoque', viewer: 'Visualizador' };
+    roleEl.textContent = roleMap[user.role] || user.role;
+  }
+  if (avatarEl) {
+    const parts = (user.name || '').trim().split(' ');
+    const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'AD').slice(0, 2).toUpperCase();
+    avatarEl.textContent = initials;
+  }
+}
+
 function checkAuthentication() {
-  const isAuth = sessionStorage.getItem(AUTH_CONFIG.STORAGE_KEY) === 'true' || localStorage.getItem(AUTH_CONFIG.STORAGE_KEY) === 'true';
+  const user = getCurrentUser();
+  const isAuth = !!user;
   const authScreen = document.getElementById('auth-screen');
   const appContainer = document.querySelector('.app-container');
 
   if (isAuth) {
     if (authScreen) authScreen.style.display = 'none';
     if (appContainer) appContainer.style.display = 'flex';
+    updateUserSidebarUI(user);
     return true;
   } else {
     if (authScreen) authScreen.style.display = 'flex';
@@ -718,27 +805,52 @@ function checkAuthentication() {
 
 window.handleLoginSubmit = function(e) {
   if (e) e.preventDefault();
+  const usernameInput = document.getElementById('auth-username');
   const passwordInput = document.getElementById('auth-password');
   const errorMsg = document.getElementById('auth-error-msg');
+
+  const enteredUser = usernameInput ? usernameInput.value.trim() : '';
   const enteredPass = passwordInput ? passwordInput.value : '';
 
-  if (enteredPass === AUTH_CONFIG.MASTER_PASSWORD) {
-    sessionStorage.setItem(AUTH_CONFIG.STORAGE_KEY, 'true');
-    localStorage.setItem(AUTH_CONFIG.STORAGE_KEY, 'true');
+  const users = getUsers();
+  const matchedUser = users.find(u => u.username.toLowerCase() === enteredUser.toLowerCase());
+
+  // Master admin direct login
+  if (enteredUser.toLowerCase() === 'admin' && enteredPass === AUTH_CONFIG.MASTER_PASSWORD) {
+    const adminUser = matchedUser || { id: 'usr_admin', name: 'Administrador', username: 'admin', role: 'admin', status: 'active' };
+    setCurrentUser(adminUser);
     if (errorMsg) errorMsg.style.display = 'none';
     checkAuthentication();
     renderApp();
     if (window.showToast) window.showToast('🟢 Acesso concedido! Bem-vindo, Administrador.', 'success');
-  } else {
+    return;
+  }
+
+  if (!matchedUser || matchedUser.password !== enteredPass) {
     if (errorMsg) {
       errorMsg.style.display = 'block';
-      errorMsg.textContent = '⚠️ Senha incorreta! Acesso exclusivo ao Administrador.';
+      errorMsg.textContent = '⚠️ Usuário ou senha incorretos!';
     }
     if (passwordInput) {
       passwordInput.value = '';
       passwordInput.focus();
     }
+    return;
   }
+
+  if (matchedUser.status === 'inactive') {
+    if (errorMsg) {
+      errorMsg.style.display = 'block';
+      errorMsg.textContent = '⛔ Conta de usuário inativa ou bloqueada!';
+    }
+    return;
+  }
+
+  setCurrentUser(matchedUser);
+  if (errorMsg) errorMsg.style.display = 'none';
+  checkAuthentication();
+  renderApp();
+  if (window.showToast) window.showToast(`🟢 Bem-vindo(a), ${matchedUser.name}!`, 'success');
 };
 
 window.toggleAuthPasswordVisibility = function() {
@@ -748,10 +860,11 @@ window.toggleAuthPasswordVisibility = function() {
 };
 
 window.handleLogout = function() {
-  sessionStorage.removeItem(AUTH_CONFIG.STORAGE_KEY);
-  localStorage.removeItem(AUTH_CONFIG.STORAGE_KEY);
+  setCurrentUser(null);
+  const usernameInput = document.getElementById('auth-username');
   const passwordInput = document.getElementById('auth-password');
   if (passwordInput) passwordInput.value = '';
+  if (usernameInput) usernameInput.value = '';
   checkAuthentication();
   if (window.showToast) window.showToast('🔒 Sessão encerrada com sucesso.', 'info');
 };
@@ -762,7 +875,8 @@ const state = {
   categoryFilter: 'all',
   statusFilter: 'all',
   sortBy: 'name',
-  editingProductId: null
+  editingProductId: null,
+  editingUserId: null
 };
 
 // Initialize App
@@ -823,6 +937,8 @@ function renderApp() {
     renderCategoriesView();
   } else if (state.currentTab === 'reports') {
     renderReportsView();
+  } else if (state.currentTab === 'users') {
+    renderUsersView();
   }
 
   setTimeout(initIcons, 50);
@@ -2411,4 +2527,372 @@ window.printInvTagsLabels = function() {
   setTimeout(() => {
     document.body.classList.remove('printing-inv-labels');
   }, 1000);
+};
+
+/* --------------------------------------------------------------------------
+   5. USER MANAGEMENT & PASSWORD CONTROL
+   -------------------------------------------------------------------------- */
+function renderUsersView() {
+  const users = getUsers();
+  
+  const totalEl = document.getElementById('stat-total-users');
+  const adminEl = document.getElementById('stat-admin-users');
+  const opEl = document.getElementById('stat-operator-users');
+  const viewEl = document.getElementById('stat-viewer-users');
+
+  if (totalEl) totalEl.textContent = users.length;
+  if (adminEl) adminEl.textContent = users.filter(u => u.role === 'admin').length;
+  if (opEl) opEl.textContent = users.filter(u => u.role === 'operator').length;
+  if (viewEl) viewEl.textContent = users.filter(u => u.role === 'viewer').length;
+
+  window.renderUsersTable();
+}
+
+window.renderUsersTable = function() {
+  const users = getUsers();
+  const searchInput = document.getElementById('users-search-input');
+  const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+
+  const filtered = q ? users.filter(u => u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)) : users;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Nenhum usuário encontrado para "${q}".</td></tr>`;
+    return;
+  }
+
+  const roleLabels = {
+    admin: '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">🛡️ Administrador</span>',
+    operator: '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">📦 Operador</span>',
+    viewer: '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">👁️ Visualizador</span>'
+  };
+
+  const statusLabels = {
+    active: '<span class="badge badge-success" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"><span class="badge-dot" style="background:#10b981;display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;"></span> Ativo</span>',
+    inactive: '<span class="badge badge-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"><span class="badge-dot" style="background:#ef4444;display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;"></span> Inativo</span>'
+  };
+
+  tbody.innerHTML = filtered.map(u => {
+    const parts = (u.name || '').trim().split(' ');
+    const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'US').slice(0, 2).toUpperCase();
+    const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-';
+
+    return `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="avatar" style="width: 34px; height: 34px; font-size: 0.8rem; background: var(--bg-card); border: 1px solid var(--border);">${initials}</div>
+            <div>
+              <strong style="color: var(--text-main); font-size: 0.9rem;">${u.name}</strong>
+            </div>
+          </div>
+        </td>
+        <td><code>@${u.username}</code></td>
+        <td>${roleLabels[u.role] || u.role}</td>
+        <td>${statusLabels[u.status] || u.status}</td>
+        <td style="color: var(--text-muted); font-size: 0.85rem;">${createdStr}</td>
+        <td style="text-align: right;">
+          <div style="display: inline-flex; gap: 0.35rem;">
+            <button class="btn btn-sm btn-secondary" onclick="window.openEditUserModal('${u.id}')" title="Editar Dados do Usuário">
+              <i data-lucide="edit"></i>
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="window.openChangeUserPasswordModal('${u.id}')" title="Alterar / Cadastrar Nova Senha">
+              <i data-lucide="key"></i>
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="window.deleteUser('${u.id}')" title="Excluir Usuário" ${u.username === 'admin' ? 'disabled style="opacity:0.3;cursor:not-allowed;"' : 'style="color:var(--danger);"'}>
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  setTimeout(initIcons, 50);
+};
+
+window.openAddUserModal = function() {
+  state.editingUserId = null;
+  const modal = document.getElementById('user-modal');
+  const title = document.getElementById('user-modal-title');
+  const form = document.getElementById('user-form');
+  const editId = document.getElementById('user-edit-id');
+  const pwdInput = document.getElementById('user-pwd');
+  const pwdConfirm = document.getElementById('user-pwd-confirm');
+  const pwdSection = document.getElementById('user-password-section');
+
+  if (form) form.reset();
+  if (editId) editId.value = '';
+  if (title) title.innerHTML = '<i data-lucide="user-plus"></i> Novo Usuário';
+  if (pwdInput) pwdInput.required = true;
+  if (pwdConfirm) pwdConfirm.required = true;
+  if (pwdSection) pwdSection.style.display = 'block';
+
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.openEditUserModal = function(userId) {
+  const user = getUserById(userId);
+  if (!user) return;
+
+  state.editingUserId = userId;
+  const modal = document.getElementById('user-modal');
+  const title = document.getElementById('user-modal-title');
+  const editId = document.getElementById('user-edit-id');
+
+  if (editId) editId.value = user.id;
+  if (title) title.innerHTML = `<i data-lucide="edit"></i> Editar Usuário: ${user.name}`;
+
+  document.getElementById('user-fullname').value = user.name || '';
+  document.getElementById('user-login').value = user.username || '';
+  document.getElementById('user-role').value = user.role || 'operator';
+  document.getElementById('user-status').value = user.status || 'active';
+
+  // Disable changing username for master admin
+  const loginInput = document.getElementById('user-login');
+  if (loginInput) loginInput.disabled = (user.username === 'admin');
+
+  // When editing, password fields are optional
+  const pwdInput = document.getElementById('user-pwd');
+  const pwdConfirm = document.getElementById('user-pwd-confirm');
+  if (pwdInput) { pwdInput.value = ''; pwdInput.required = false; }
+  if (pwdConfirm) { pwdConfirm.value = ''; pwdConfirm.required = false; }
+
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeUserModal = function() {
+  const modal = document.getElementById('user-modal');
+  const loginInput = document.getElementById('user-login');
+  if (loginInput) loginInput.disabled = false;
+  if (modal) modal.classList.remove('active');
+};
+
+window.handleUserFormSubmit = function(e) {
+  if (e) e.preventDefault();
+
+  const editId = document.getElementById('user-edit-id').value;
+  const name = document.getElementById('user-fullname').value.trim();
+  const username = document.getElementById('user-login').value.trim().toLowerCase();
+  const role = document.getElementById('user-role').value;
+  const status = document.getElementById('user-status').value;
+  const pwd = document.getElementById('user-pwd').value;
+  const pwdConfirm = document.getElementById('user-pwd-confirm').value;
+
+  if (!name || !username) {
+    showToast('Preencha o Nome e o Nome de Usuário.', 'warning');
+    return;
+  }
+
+  const users = getUsers();
+
+  // Check username uniqueness
+  const existingUser = users.find(u => u.username.toLowerCase() === username && u.id !== editId);
+  if (existingUser) {
+    showToast(`O nome de usuário "@${username}" já está em uso. Escolha outro.`, 'danger');
+    return;
+  }
+
+  if (!editId) {
+    // New user: password required
+    if (!pwd || pwd.length < 4) {
+      showToast('A senha deve conter no mínimo 4 caracteres.', 'warning');
+      return;
+    }
+    if (pwd !== pwdConfirm) {
+      showToast('A confirmação de senha não confere.', 'danger');
+      return;
+    }
+
+    const newUser = {
+      id: 'usr_' + Date.now(),
+      name,
+      username,
+      password: pwd,
+      role,
+      status,
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    saveUsers(users);
+    showToast(`Usuário "@${username}" cadastrado com sucesso!`, 'success');
+  } else {
+    // Edit existing user
+    const idx = users.findIndex(u => u.id === editId);
+    if (idx === -1) return;
+
+    users[idx].name = name;
+    if (users[idx].username !== 'admin') {
+      users[idx].username = username;
+    }
+    users[idx].role = role;
+    users[idx].status = status;
+
+    if (pwd) {
+      if (pwd.length < 4) {
+        showToast('A senha deve conter no mínimo 4 caracteres.', 'warning');
+        return;
+      }
+      if (pwd !== pwdConfirm) {
+        showToast('A confirmação de senha não confere.', 'danger');
+        return;
+      }
+      users[idx].password = pwd;
+    }
+
+    saveUsers(users);
+
+    // If editing current logged user, update session
+    const current = getCurrentUser();
+    if (current && current.id === editId) {
+      setCurrentUser(users[idx]);
+    }
+
+    showToast(`Usuário "${name}" atualizado com sucesso!`, 'success');
+  }
+
+  window.closeUserModal();
+  renderUsersView();
+};
+
+window.openChangeUserPasswordModal = function(userId) {
+  const user = getUserById(userId);
+  if (!user) return;
+
+  const modal = document.getElementById('change-pwd-modal');
+  const inputId = document.getElementById('change-pwd-user-id');
+  const subtitle = document.getElementById('change-pwd-subtitle');
+  const form = document.getElementById('change-pwd-form');
+
+  if (form) form.reset();
+  if (inputId) inputId.value = user.id;
+  if (subtitle) subtitle.textContent = `Defina uma nova senha para @${user.username} (${user.name})`;
+
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeChangePwdModal = function() {
+  const modal = document.getElementById('change-pwd-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.handleChangePwdSubmit = function(e) {
+  if (e) e.preventDefault();
+  const userId = document.getElementById('change-pwd-user-id').value;
+  const newPwd = document.getElementById('new-user-pwd').value;
+  const newPwdConfirm = document.getElementById('new-user-pwd-confirm').value;
+
+  if (!newPwd || newPwd.length < 4) {
+    showToast('A nova senha deve ter no mínimo 4 caracteres.', 'warning');
+    return;
+  }
+
+  if (newPwd !== newPwdConfirm) {
+    showToast('A confirmação de senha não confere!', 'danger');
+    return;
+  }
+
+  const users = getUsers();
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx === -1) return;
+
+  users[idx].password = newPwd;
+  saveUsers(users);
+
+  showToast(`🔑 Senha do usuário @${users[idx].username} alterada com sucesso!`, 'success');
+  window.closeChangePwdModal();
+};
+
+window.deleteUser = function(userId) {
+  const user = getUserById(userId);
+  if (!user) return;
+
+  if (user.username === 'admin') {
+    showToast('O usuário Administrador principal não pode ser excluído!', 'warning');
+    return;
+  }
+
+  const current = getCurrentUser();
+  if (current && current.id === userId) {
+    showToast('Você não pode excluir o seu próprio usuário logado!', 'warning');
+    return;
+  }
+
+  if (!confirm(`Deseja realmente excluir a conta do usuário "${user.name}" (@${user.username})?`)) {
+    return;
+  }
+
+  const users = getUsers().filter(u => u.id !== userId);
+  saveUsers(users);
+  showToast(`Usuário "@${user.username}" excluído com sucesso.`, 'info');
+  renderUsersView();
+};
+
+/* Self Profile Modal */
+window.openSelfProfileModal = function() {
+  const user = getCurrentUser();
+  if (!user) return;
+
+  const fullUser = getUserById(user.id) || user;
+  const modal = document.getElementById('self-profile-modal');
+  const nameEl = document.getElementById('self-modal-name');
+  const metaEl = document.getElementById('self-modal-meta');
+  const avatarEl = document.getElementById('self-modal-avatar');
+  const form = document.getElementById('self-profile-form');
+
+  if (form) form.reset();
+  if (nameEl) nameEl.textContent = fullUser.name;
+  if (metaEl) metaEl.textContent = `@${fullUser.username} • Perfil: ${fullUser.role === 'admin' ? 'Administrador' : fullUser.role}`;
+  if (avatarEl) {
+    const parts = (fullUser.name || '').trim().split(' ');
+    const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'AD').slice(0, 2).toUpperCase();
+    avatarEl.textContent = initials;
+  }
+
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeSelfProfileModal = function() {
+  const modal = document.getElementById('self-profile-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.handleSelfProfileSubmit = function(e) {
+  if (e) e.preventDefault();
+  const current = getCurrentUser();
+  if (!current) return;
+
+  const currentPwd = document.getElementById('self-current-pwd').value;
+  const newPwd = document.getElementById('self-new-pwd').value;
+  const newPwdConfirm = document.getElementById('self-new-pwd-confirm').value;
+
+  const users = getUsers();
+  const idx = users.findIndex(u => u.id === current.id);
+  if (idx === -1) return;
+
+  if (users[idx].password !== currentPwd && currentPwd !== AUTH_CONFIG.MASTER_PASSWORD) {
+    showToast('A senha atual informada está incorreta.', 'danger');
+    return;
+  }
+
+  if (!newPwd || newPwd.length < 4) {
+    showToast('A nova senha deve ter pelo menos 4 caracteres.', 'warning');
+    return;
+  }
+
+  if (newPwd !== newPwdConfirm) {
+    showToast('A confirmação da nova senha não confere.', 'danger');
+    return;
+  }
+
+  users[idx].password = newPwd;
+  saveUsers(users);
+  showToast('🔑 Sua senha foi alterada com sucesso!', 'success');
+  window.closeSelfProfileModal();
 };
