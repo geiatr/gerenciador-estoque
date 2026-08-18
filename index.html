@@ -35,13 +35,18 @@
       </div>
 
       <h2 style="font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;">StockMaster Enterprise</h2>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.75rem;">
-        🔒 Acesso Restrito • Digite a senha do Administrador para operar o sistema.
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+        🔒 Acesso Restrito • Digite seu usuário e senha para entrar no sistema.
       </p>
 
       <form id="auth-form" onsubmit="window.handleLoginSubmit(event)">
+        <div class="form-group" style="text-align: left; margin-bottom: 1rem;">
+          <label for="auth-username" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Usuário / Login *</label>
+          <input type="text" id="auth-username" class="form-control" placeholder="Ex: admin ou seu usuário" required style="font-size: 0.95rem; margin-top: 0.35rem;" autofocus>
+        </div>
+
         <div class="form-group" style="text-align: left; margin-bottom: 1.25rem;">
-          <label for="auth-password" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Senha do Administrador *</label>
+          <label for="auth-password" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Senha *</label>
           <div style="position: relative; margin-top: 0.35rem;">
             <input type="password" id="auth-password" class="form-control" placeholder="Sua senha de acesso..." required style="padding-right: 2.75rem; font-size: 0.95rem;">
             <button type="button" onclick="window.toggleAuthPasswordVisibility()" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar Senha">
@@ -51,7 +56,7 @@
         </div>
 
         <div id="auth-error-msg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #f87171; padding: 0.6rem; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 1.25rem;">
-          ⚠️ Senha incorreta! Acesso exclusivo ao Administrador.
+          ⚠️ Usuário ou senha incorretos!
         </div>
 
         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 0.95rem; font-weight: 600; justify-content: center; display: flex; align-items: center; gap: 0.5rem;">
@@ -59,8 +64,12 @@
         </button>
       </form>
 
-      <div style="font-size: 0.725rem; color: var(--text-dark); margin-top: 1.75rem; border-top: 1px solid var(--border); padding-top: 1rem;">
-        IA TECNOLOGIA • Sistema Protegido & Fechado ao Público
+      <div style="font-size: 0.725rem; color: var(--text-muted); margin-top: 1.25rem; background: rgba(255,255,255,0.03); padding: 0.5rem; border-radius: var(--radius-sm); border: 1px dashed var(--border);">
+        💡 Acesso padrão: Usuário: <strong>admin</strong> | Senha: <strong>RfuC@21051963</strong>
+      </div>
+
+      <div style="font-size: 0.725rem; color: var(--text-dark); margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 0.85rem;">
+        IA TECNOLOGIA • Sistema de Gestão Patrimonial e Estoque
       </div>
     </div>
   </div>
@@ -111,16 +120,22 @@
               <span>Relatórios</span>
             </button>
           </li>
+          <li class="nav-item">
+            <button data-tab="users" id="nav-btn-users">
+              <i data-lucide="users"></i>
+              <span>Usuários</span>
+            </button>
+          </li>
         </ul>
       </nav>
 
       <div class="sidebar-footer">
         <div class="user-profile" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div class="avatar">AD</div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer;" onclick="window.openSelfProfileModal()" title="Meu Perfil / Alterar Senha">
+            <div class="avatar" id="current-user-avatar">AD</div>
             <div class="user-info">
-              <span class="user-name">Administrador</span>
-              <span class="user-role">IA TECNOLOGIA</span>
+              <span class="user-name" id="current-user-name">Administrador</span>
+              <span class="user-role" id="current-user-role">IA TECNOLOGIA</span>
             </div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="window.handleLogout()" title="Encerrar Sessão e Bloquear Sistema" style="padding: 0.35rem 0.6rem; color: var(--danger); font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.3);">
@@ -563,6 +578,85 @@
           </div>
         </section>
 
+        <!-- SECTION 6: USERS VIEW -->
+        <section id="view-users" class="view-section">
+          <div class="page-header">
+            <div class="page-title">
+              <h2>Gestão de Usuários e Senhas</h2>
+              <p>Cadastre novos usuários, gerencie senhas e controle níveis de acesso ao sistema.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-primary" onclick="window.openAddUserModal()">
+                <i data-lucide="user-plus"></i> Novo Usuário
+              </button>
+            </div>
+          </div>
+
+          <!-- User Stats Cards -->
+          <div class="stats-grid" style="margin-bottom: 2rem;">
+            <div class="stat-card" style="--card-accent: var(--primary);">
+              <div class="stat-info">
+                <h4>Total de Usuários</h4>
+                <div class="value" id="stat-total-users">1</div>
+                <div class="subtitle">Contas cadastradas</div>
+              </div>
+              <div class="stat-icon"><i data-lucide="users"></i></div>
+            </div>
+            <div class="stat-card" style="--card-accent: var(--warning);">
+              <div class="stat-info">
+                <h4>Administradores</h4>
+                <div class="value" id="stat-admin-users">1</div>
+                <div class="subtitle">Acesso irrestrito</div>
+              </div>
+              <div class="stat-icon"><i data-lucide="shield-check"></i></div>
+            </div>
+            <div class="stat-card" style="--card-accent: var(--success);">
+              <div class="stat-info">
+                <h4>Operadores</h4>
+                <div class="value" id="stat-operator-users">0</div>
+                <div class="subtitle">Estoque e movimentações</div>
+              </div>
+              <div class="stat-icon"><i data-lucide="user-check"></i></div>
+            </div>
+            <div class="stat-card" style="--card-accent: var(--secondary);">
+              <div class="stat-info">
+                <h4>Visualizadores</h4>
+                <div class="value" id="stat-viewer-users">0</div>
+                <div class="subtitle">Somente consulta</div>
+              </div>
+              <div class="stat-icon"><i data-lucide="eye"></i></div>
+            </div>
+          </div>
+
+          <!-- Users Table Container -->
+          <div class="table-container">
+            <div class="table-toolbar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              <div class="search-box" style="max-width: 380px;">
+                <i data-lucide="search"></i>
+                <input type="text" id="users-search-input" oninput="window.renderUsersTable()" placeholder="Buscar usuário por nome ou login...">
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="window.renderUsersTable()">
+                <i data-lucide="refresh-cw"></i> Atualizar Lista
+              </button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Login / Username</th>
+                  <th>Perfil de Acesso</th>
+                  <th>Status</th>
+                  <th>Criado Em</th>
+                  <th style="text-align: right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -910,6 +1004,169 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="window.closeInvTagsModal()">Fechar</button>
       </div>
+    </div>
+  <!-- MODAL: ADD / EDIT USER -->
+  <div class="modal-backdrop" id="user-modal">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="user-modal-title" style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+            <i data-lucide="user-plus"></i> Novo Usuário
+          </h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+            Preencha os dados e credenciais de acesso do usuário
+          </p>
+        </div>
+        <button class="close-btn" onclick="window.closeUserModal()">&times;</button>
+      </div>
+
+      <form id="user-form" onsubmit="window.handleUserFormSubmit(event)">
+        <input type="hidden" id="user-edit-id">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="user-fullname">Nome Completo *</label>
+            <input type="text" id="user-fullname" class="form-control" placeholder="Ex: Carlos Eduardo de Oliveira" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="user-login">Nome de Usuário / Login *</label>
+              <input type="text" id="user-login" class="form-control" placeholder="Ex: carlos.oliveira" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="user-role">Perfil de Acesso *</label>
+              <select id="user-role" class="form-control" required>
+                <option value="admin">Administrador (Acesso Total)</option>
+                <option value="operator" selected>Operador (Estoque & Movimentações)</option>
+                <option value="viewer">Visualizador (Somente Consulta)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="user-password-section">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="user-pwd">Senha de Acesso *</label>
+                <input type="password" id="user-pwd" class="form-control" placeholder="Digite a senha..." autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label for="user-pwd-confirm">Confirmar Senha *</label>
+                <input type="password" id="user-pwd-confirm" class="form-control" placeholder="Repita a senha..." autocomplete="new-password">
+              </div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: -0.25rem; margin-bottom: 0.75rem;">
+              ℹ️ A senha deve conter no mínimo 4 caracteres.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="user-status">Status da Conta</label>
+            <select id="user-status" class="form-control">
+              <option value="active">🟢 Ativo (Acesso Liberado)</option>
+              <option value="inactive">🔴 Inativo (Acesso Bloqueado)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeUserModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="save"></i> Salvar Usuário
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHANGE USER PASSWORD -->
+  <div class="modal-backdrop" id="change-pwd-modal">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+            <i data-lucide="key"></i> Alterar Senha de Usuário
+          </h3>
+          <p id="change-pwd-subtitle" style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+            Defina uma nova senha para o usuário selecionado
+          </p>
+        </div>
+        <button class="close-btn" onclick="window.closeChangePwdModal()">&times;</button>
+      </div>
+
+      <form id="change-pwd-form" onsubmit="window.handleChangePwdSubmit(event)">
+        <input type="hidden" id="change-pwd-user-id">
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="new-user-pwd">Nova Senha *</label>
+            <input type="password" id="new-user-pwd" class="form-control" placeholder="Digite a nova senha..." required minlength="4">
+          </div>
+          <div class="form-group">
+            <label for="new-user-pwd-confirm">Confirmar Nova Senha *</label>
+            <input type="password" id="new-user-pwd-confirm" class="form-control" placeholder="Repita a nova senha..." required minlength="4">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeChangePwdModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Atualizar Senha
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SELF PROFILE / CHANGE OWN PASSWORD -->
+  <div class="modal-backdrop" id="self-profile-modal">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+            <i data-lucide="user-cog"></i> Meu Perfil & Senha
+          </h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+            Atualize sua senha de acesso
+          </p>
+        </div>
+        <button class="close-btn" onclick="window.closeSelfProfileModal()">&times;</button>
+      </div>
+
+      <form id="self-profile-form" onsubmit="window.handleSelfProfileSubmit(event)">
+        <div class="modal-body">
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; background: rgba(15, 23, 42, 0.4); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+            <div class="avatar" id="self-modal-avatar" style="width: 46px; height: 46px; font-size: 1.1rem;">AD</div>
+            <div>
+              <div id="self-modal-name" style="font-weight: 700; font-size: 1rem; color: var(--text-main);">-</div>
+              <div id="self-modal-meta" style="font-size: 0.8rem; color: var(--text-muted);">-</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="self-current-pwd">Senha Atual *</label>
+            <input type="password" id="self-current-pwd" class="form-control" placeholder="Digite sua senha atual..." required>
+          </div>
+
+          <div class="form-group">
+            <label for="self-new-pwd">Nova Senha *</label>
+            <input type="password" id="self-new-pwd" class="form-control" placeholder="Digite a nova senha desejada..." required minlength="4">
+          </div>
+
+          <div class="form-group">
+            <label for="self-new-pwd-confirm">Confirmar Nova Senha *</label>
+            <input type="password" id="self-new-pwd-confirm" class="form-control" placeholder="Confirme a nova senha..." required minlength="4">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeSelfProfileModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Salvar Nova Senha
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
