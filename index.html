@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockMaster - Sistema Inteligente de Gerenciamento de Estoque</title>
+  <meta name="description" content="Plataforma moderna de controle e gerenciamento de estoque com estatísticas em tempo real, movimentações de produtos, alertas de estoque baixo e relatórios.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- SheetJS (Excel .xlsx / .xls support) CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- AUTH / LOCK SCREEN CONTAINER -->
+  <div id="auth-screen" style="position: fixed; inset: 0; background: var(--bg-dark); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 1.5rem;">
+    <div style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2.5rem; max-width: 440px; width: 100%; box-shadow: var(--shadow-lg); text-align: center;">
+      
+      <!-- Company Brand Logo -->
+      <div style="background: #ffffff; padding: 10px 16px; border-radius: var(--radius-md); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+        <img src="./assets/logo.png" alt="IA TECNOLOGIA" style="height: 44px; object-fit: contain;">
+      </div>
+
+      <h2 style="font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;">StockMaster Enterprise</h2>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.75rem;">
+        🔒 Acesso Restrito • Digite a senha do Administrador para operar o sistema.
+      </p>
+
+      <form id="auth-form" onsubmit="window.handleLoginSubmit(event)">
+        <div class="form-group" style="text-align: left; margin-bottom: 1.25rem;">
+          <label for="auth-password" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Senha do Administrador *</label>
+          <div style="position: relative; margin-top: 0.35rem;">
+            <input type="password" id="auth-password" class="form-control" placeholder="Sua senha de acesso..." required style="padding-right: 2.75rem; font-size: 0.95rem;">
+            <button type="button" onclick="window.toggleAuthPasswordVisibility()" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar Senha">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div id="auth-error-msg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #f87171; padding: 0.6rem; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 1.25rem;">
+          ⚠️ Senha incorreta! Acesso exclusivo ao Administrador.
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 0.95rem; font-weight: 600; justify-content: center; display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="lock"></i> Entrar no Sistema
+        </button>
+      </form>
+
+      <div style="font-size: 0.725rem; color: var(--text-dark); margin-top: 1.75rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+        IA TECNOLOGIA • Sistema Protegido & Fechado ao Público
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container" style="display: none;">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="main-sidebar">
+      <div class="brand" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.65rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+        <div style="background: #ffffff; padding: 6px 10px; border-radius: var(--radius-md); width: 100%; display: flex; align-items: center; justify-content: center;">
+          <img src="./assets/logo.png" alt="IA TECNOLOGIA" style="height: 32px; max-width: 100%; object-fit: contain;">
+        </div>
+        <div class="brand-text">
+          <h1 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin: 0;">StockMaster</h1>
+          <span style="font-size: 0.725rem; color: var(--text-muted);">IA TECNOLOGIA • Gestão de Estoque</span>
+        </div>
+      </div>
+
+      <nav aria-label="Navegação Principal">
+        <ul class="nav-menu">
+          <li class="nav-item active">
+            <button data-tab="dashboard" id="nav-btn-dashboard">
+              <i data-lucide="layout-dashboard"></i>
+              <span>Dashboard</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button data-tab="inventory" id="nav-btn-inventory">
+              <i data-lucide="boxes"></i>
+              <span>Inventário</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button data-tab="transactions" id="nav-btn-transactions">
+              <i data-lucide="arrow-left-right"></i>
+              <span>Movimentações</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button data-tab="categories" id="nav-btn-categories">
+              <i data-lucide="folder-tree"></i>
+              <span>Categorias</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button data-tab="reports" id="nav-btn-reports">
+              <i data-lucide="bar-chart-3"></i>
+              <span>Relatórios</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="avatar">AD</div>
+            <div class="user-info">
+              <span class="user-name">Administrador</span>
+              <span class="user-role">IA TECNOLOGIA</span>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="window.handleLogout()" title="Encerrar Sessão e Bloquear Sistema" style="padding: 0.35rem 0.6rem; color: var(--danger); font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.3);">
+            <i data-lucide="log-out"></i> Sair
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      <!-- Hidden File Input for Importing Excel / CSV files -->
+      <input type="file" id="file-import-input" accept=".xlsx, .xls, .csv, .txt" style="display: none;" onchange="window.handleImportFile(event)">
+      
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="search-box">
+          <i data-lucide="search"></i>
+          <input type="text" id="global-search" placeholder="Buscar produtos por nome, SKU ou categoria...">
+        </div>
+
+        <div class="header-actions">
+          <button class="btn btn-secondary" id="btn-quick-transaction" onclick="openTransactionModal()">
+            <i data-lucide="repeat"></i> Movimentação
+          </button>
+          <button class="btn btn-primary" id="btn-quick-add-product" onclick="openAddProductModal()">
+            <i data-lucide="plus"></i> Novo Produto
+          </button>
+          <button class="icon-btn" title="Notificações" id="btn-notifications">
+            <i data-lucide="bell"></i>
+            <span class="badge-dot" id="notification-badge"></span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Body Container -->
+      <main class="content-body">
+        
+        <!-- PRINT ONLY HEADER (Visible only on paper / print preview) -->
+        <div class="print-only-header">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <img src="./assets/logo.png" alt="IA TECNOLOGIA" style="height: 42px; object-fit: contain;">
+              <div>
+                <h1 style="font-size: 1.4rem; margin: 0; color: #000;">📦 StockMaster - Relatório de Gerenciamento de Estoque</h1>
+                <p style="font-size: 0.85rem; color: #555; margin: 0.25rem 0 0 0;">IA TECNOLOGIA - Sistema de gestão patrimonial e controle de produtos</p>
+              </div>
+            </div>
+            <div style="text-align: right; font-size: 0.8rem; color: #555;">
+              <div><strong>Data da Impressão:</strong> <span id="print-date-display">-</span></div>
+              <div><strong>Empresa:</strong> IA TECNOLOGIA</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 1: DASHBOARD VIEW -->
+        <section id="view-dashboard" class="view-section active">
+          <div class="page-header">
+            <div class="page-title">
+              <h2>Visão Geral do Estoque</h2>
+              <p>Acompanhe o desempenho, valor patrimonial e indicadores em tempo real.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Visão Geral do Dashboard">
+                <i data-lucide="printer"></i> Imprimir
+              </button>
+              <button class="btn btn-secondary" onclick="window.triggerImportFile()" title="Importar planilha Excel (.xlsx / .csv)">
+                <i data-lucide="upload"></i> Importar Excel (.xlsx)
+              </button>
+              <button class="btn btn-secondary" onclick="window.exportInventoryExcel()" title="Exportar planilha Excel (.xlsx)">
+                <i data-lucide="file-spreadsheet"></i> Exportar Excel (.xlsx)
+              </button>
+            </div>
+          </div>
+
+          <!-- Stat Cards Row -->
+          <div class="stats-grid">
+            <div class="stat-card" style="--card-accent: var(--primary);">
+              <div class="stat-info">
+                <h4>Valor Total do Estoque</h4>
+                <div class="value" id="stat-total-value">R$ 0,00</div>
+                <div class="subtitle">Patrimônio acumulado</div>
+              </div>
+              <div class="stat-icon">
+                <i data-lucide="dollar-sign"></i>
+              </div>
+            </div>
+
+            <div class="stat-card" style="--card-accent: var(--secondary);">
+              <div class="stat-info">
+                <h4>Total em Estoque</h4>
+                <div class="value" id="stat-total-items">0 unid.</div>
+                <div class="subtitle">Volume físico total</div>
+              </div>
+              <div class="stat-icon">
+                <i data-lucide="package"></i>
+              </div>
+            </div>
+
+            <div class="stat-card" style="--card-accent: var(--warning);">
+              <div class="stat-info">
+                <h4>Estoque Baixo</h4>
+                <div class="value" id="stat-low-stock">0</div>
+                <div class="subtitle">Necessita reposição urgente</div>
+              </div>
+              <div class="stat-icon">
+                <i data-lucide="alert-triangle"></i>
+              </div>
+            </div>
+
+            <div class="stat-card" style="--card-accent: var(--danger);">
+              <div class="stat-info">
+                <h4>Produtos Esgotados</h4>
+                <div class="value" id="stat-out-stock">0</div>
+                <div class="subtitle">Estoque zerado</div>
+              </div>
+              <div class="stat-icon">
+                <i data-lucide="x-circle"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>Movimentações Recentes (Entradas vs Saídas)</h3>
+              </div>
+              <div class="chart-container">
+                <canvas id="movementChart"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>Distribuição por Categoria</h3>
+              </div>
+              <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Critical Items Table & Feed Grid -->
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+            <div class="table-container">
+              <div class="table-toolbar" style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 600;">⚠️ Produtos em Nível Crítico</h3>
+                  <span style="font-size: 0.8rem; color: var(--text-muted);">Ação recomendada imediata</span>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="window.openEmailReportModal('out.logistica!@iatr.com.br')" title="Enviar Relatório dos Produtos Críticos por E-mail">
+                  <i data-lucide="mail"></i> Enviar p/ E-mail
+                </button>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th>Categoria</th>
+                    <th>Qtd / Mínimo</th>
+                    <th>Status</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="critical-stock-tbody">
+                  <!-- Injected via JavaScript -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header" style="display: flex; align-items: center; justify-content: space-between;">
+                <h3>Últimas Atividades</h3>
+                <button class="btn btn-sm btn-secondary" onclick="window.clearActivityHistory()" title="Apagar Histórico de Atividades" style="color: var(--danger); font-size: 0.75rem;">
+                  <i data-lucide="trash-2"></i> Limpar
+                </button>
+              </div>
+              <div id="recent-activity-list">
+                <!-- Injected via JavaScript -->
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- SECTION 2: INVENTORY VIEW -->
+        <section id="view-inventory" class="view-section">
+          <div class="page-header">
+            <div class="page-title">
+              <h2>Catálogo de Inventário</h2>
+              <p>Gerencie produtos, quantidades, fornecedores e pontos de reposição.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Tabela de Inventário">
+                <i data-lucide="printer"></i> Imprimir
+              </button>
+              <button class="btn btn-secondary" onclick="window.triggerImportFile()" title="Importar planilha Excel (.xlsx / .csv)">
+                <i data-lucide="upload"></i> Importar Excel (.xlsx)
+              </button>
+              <button class="btn btn-primary" onclick="openAddProductModal()">
+                <i data-lucide="plus"></i> Cadastrar Produto
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Category Pills Bar -->
+          <div id="quick-category-pills" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+            <!-- Injected via JavaScript -->
+          </div>
+
+          <div class="table-container">
+            <!-- Toolbar Filters -->
+            <div class="table-toolbar">
+              <div class="filter-group">
+                <div class="search-box" style="max-width: 260px; min-width: 200px;">
+                  <i data-lucide="search"></i>
+                  <input type="text" id="inventory-search" placeholder="🔍 Pesquisar no inventário...">
+                </div>
+
+                <select id="filter-category" class="form-select">
+                  <option value="all">Todas as Categorias</option>
+                </select>
+
+                <select id="filter-status" class="form-select">
+                  <option value="all">Todos os Status</option>
+                  <option value="ok">Em Estoque</option>
+                  <option value="low">Estoque Baixo</option>
+                  <option value="out">Esgotado</option>
+                </select>
+
+                <select id="filter-sort" class="form-select">
+                  <option value="name">Ordenar por: Nome</option>
+                  <option value="sku">Ordenar por: SKU</option>
+                  <option value="quantity">Ordenar por: Maior Quantidade</option>
+                  <option value="value">Ordenar por: Maior Valor Total</option>
+                </select>
+              </div>
+
+              <span id="inventory-count-label" style="font-size: 0.85rem; color: var(--text-muted);">
+                Exibindo produtos...
+              </span>
+            </div>
+
+            <!-- Table -->
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Produto / SKU</th>
+                  <th>Categoria</th>
+                  <th>Nível do Estoque</th>
+                  <th>Status</th>
+                  <th>Preço Unit.</th>
+                  <th>Valor Total</th>
+                  <th>Localização</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SECTION 3: TRANSACTIONS VIEW -->
+        <section id="view-transactions" class="view-section">
+          <div class="page-header">
+            <div class="page-title">
+              <h2>Histórico de Movimentações</h2>
+              <p>Registro auditável de todas as entradas e saídas de mercadorias.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" onclick="window.clearActivityHistory()" title="Apagar Histórico de Atividades e Movimentações" style="color: var(--danger);">
+                <i data-lucide="trash-2"></i> Limpar Histórico
+              </button>
+              <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Histórico de Movimentações">
+                <i data-lucide="printer"></i> Imprimir
+              </button>
+              <button class="btn btn-success" onclick="openTransactionModal()">
+                <i data-lucide="plus-circle"></i> Registrar Nova Movimentação
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Cód. Transação</th>
+                  <th>Produto</th>
+                  <th>Tipo</th>
+                  <th>Qtd Movimentada</th>
+                  <th>Saldo (Anterior ➔ Novo)</th>
+                  <th>Motivo / Observação</th>
+                  <th>Usuário / Data</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="transactions-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SECTION 4: CATEGORIES & SUPPLIERS VIEW -->
+        <section id="view-categories" class="view-section">
+          <div class="page-header">
+            <div class="page-title">
+              <h2>Gestão de Categorias</h2>
+              <p>Organização por famílias de produtos e controle patrimonial do inventário.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Visão de Categorias">
+                <i data-lucide="printer"></i> Imprimir
+              </button>
+            </div>
+          </div>
+
+          <!-- CATEGORY SUB-TABS SPECIFIC BUTTONS BAR -->
+          <div class="category-subtabs-bar" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.75rem; background: rgba(15, 23, 42, 0.5); padding: 0.85rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+            <button class="btn btn-sm btn-primary" id="cat-tab-all" onclick="window.selectCategorySubtab('all')">
+              📁 Todas as Categorias
+            </button>
+            <button class="btn btn-sm btn-secondary" id="cat-tab-eletronicos" onclick="window.selectCategorySubtab('eletronicos')">
+              💻 Eletrônicos & Informática
+            </button>
+            <button class="btn btn-sm btn-secondary" id="cat-tab-perifericos" onclick="window.selectCategorySubtab('perifericos')">
+              ⌨️ Periféricos & Acessórios
+            </button>
+            <button class="btn btn-sm btn-secondary" id="cat-tab-moveis" onclick="window.selectCategorySubtab('moveis')">
+              🪑 Móveis & Utensílios
+            </button>
+            <button class="btn btn-sm btn-secondary" id="cat-tab-armazenamento" onclick="window.selectCategorySubtab('armazenamento')">
+              💾 Armazenamento & Memória
+            </button>
+            <button class="btn btn-sm btn-secondary" id="cat-tab-cabos" onclick="window.selectCategorySubtab('cabos')">
+              🔌 Cabos & Conectividade
+            </button>
+            <button class="btn btn-sm btn-secondary" id="cat-tab-impressoras" onclick="window.selectCategorySubtab('impressoras')">
+              🖨️ Impressoras & Scanners
+            </button>
+          </div>
+
+          <!-- DYNAMIC CATEGORIES PANELS CONTAINER -->
+          <div id="categories-dynamic-container" style="display: flex; flex-direction: column; gap: 2rem; margin-bottom: 2.5rem;">
+            <!-- Injected via JavaScript -->
+          </div>
+
+          <!-- FORNECEDORES CADASTRADOS SECTION -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; margin-top: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-main); margin: 0;">
+              🤝 Fornecedores Cadastrados
+            </h3>
+            <button class="btn btn-sm btn-primary" onclick="window.openAddSupplierModal()">
+              <i data-lucide="plus"></i> Cadastrar Fornecedor
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Razão Social / Nome</th>
+                  <th>Pessoa de Contato</th>
+                  <th>E-mail</th>
+                  <th>Telefone</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="suppliers-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SECTION 5: REPORTS VIEW -->
+        <section id="view-reports" class="view-section">
+          <div class="page-header">
+            <div class="page-title">
+              <h2>Relatórios e Análise de Patrimônio</h2>
+              <p>Relatório sintético do valor em estoque e planejamento financeiro.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" onclick="window.openEmailReportModal('out.logistica!@iatr.com.br')" title="Enviar Relatório dos Produtos Críticos por E-mail">
+                <i data-lucide="mail"></i> Enviar p/ E-mail
+              </button>
+              <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Relatório Sintético">
+                <i data-lucide="printer"></i> Imprimir Relatório
+              </button>
+              <button class="btn btn-secondary" onclick="window.triggerImportFile()" title="Importar planilha Excel (.xlsx / .csv)">
+                <i data-lucide="upload"></i> Importar Excel (.xlsx)
+              </button>
+              <button class="btn btn-primary" onclick="window.exportInventoryExcel()" title="Exportar planilha Excel (.xlsx)">
+                <i data-lucide="file-spreadsheet"></i> Baixar Relatório Excel (.xlsx)
+              </button>
+            </div>
+          </div>
+
+          <div class="stats-grid" style="margin-bottom: 2rem;">
+            <div class="stat-card" style="--card-accent: var(--primary);">
+              <div class="stat-info">
+                <h4>Patrimônio Total</h4>
+                <div class="value" id="report-total-val">R$ 0,00</div>
+              </div>
+            </div>
+            <div class="stat-card" style="--card-accent: var(--success);">
+              <div class="stat-info">
+                <h4>Unidades Físicas Total</h4>
+                <div class="value" id="report-total-qty">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="--card-accent: var(--warning);">
+              <div class="stat-info">
+                <h4>Itens em Alerta / Zerados</h4>
+                <div class="value" id="report-low-count">0</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <div class="table-toolbar">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">Top 5 Produtos de Maior Valor em Estoque</h3>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th>Quantidade</th>
+                  <th>Preço Unitário</th>
+                  <th>Valor em Estoque</th>
+                </tr>
+              </thead>
+              <tbody id="top-valuable-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT PRODUCT -->
+  <div class="modal-backdrop" id="product-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="product-modal-title">Novo Produto</h3>
+        <button class="close-btn" onclick="closeProductModal()">&times;</button>
+      </div>
+
+      <!-- Modal Sub-Tabs Navigation -->
+      <div class="modal-tabs">
+        <button type="button" class="modal-tab-btn active" id="modal-tab-btn-geral" onclick="window.switchProductModalTab('geral')">
+          📦 Dados do Produto
+        </button>
+        <button type="button" class="modal-tab-btn" id="modal-tab-btn-nf" onclick="window.switchProductModalTab('nf')">
+          📄 Nota Fiscal (NF-e)
+        </button>
+      </div>
+
+      <form id="product-form">
+        <div class="modal-body">
+          <!-- SUB-TAB 1: DADOS GERAIS DO PRODUTO -->
+          <div id="product-tab-content-geral" class="form-grid">
+            <div class="form-group">
+              <label for="product-sku">Código / SKU *</label>
+              <input type="text" id="product-sku" class="form-control" required placeholder="Ex: PROD-101">
+            </div>
+
+            <div class="form-group">
+              <label for="product-icon">Ícone Emoji</label>
+              <input type="text" id="product-icon" class="form-control" placeholder="Ex: 💻, 🖥️, 📦" value="📦">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="product-name">Nome do Produto *</label>
+              <input type="text" id="product-name" class="form-control" required placeholder="Ex: Notebook Pro 15''">
+            </div>
+
+            <div class="form-group">
+              <label for="product-category">Categoria *</label>
+              <select id="product-category" class="form-control" required>
+                <!-- Populated via JS -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="product-supplier">Fornecedor</label>
+              <select id="product-supplier" class="form-control">
+                <!-- Populated via JS -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="product-quantity">Qtd Inicial em Estoque *</label>
+              <input type="number" id="product-quantity" class="form-control" min="0" value="10" required>
+            </div>
+
+            <div class="form-group">
+              <label for="product-min-quantity">Estoque Mínimo (Alerta) *</label>
+              <input type="number" id="product-min-quantity" class="form-control" min="0" value="5" required>
+            </div>
+
+            <div class="form-group">
+              <label for="product-price">Preço Unitário (R$) *</label>
+              <input type="number" id="product-price" class="form-control" min="0" step="0.01" value="99.90" required>
+            </div>
+
+            <div class="form-group">
+              <label for="product-location">Localização / Prateleira</label>
+              <input type="text" id="product-location" class="form-control" placeholder="Ex: Corredor A - Prateleira 2">
+            </div>
+          </div>
+
+          <!-- SUB-TAB 2: NOTA FISCAL (NF-e) -->
+          <div id="product-tab-content-nf" style="display: none;" class="form-grid">
+            <div class="form-group">
+              <label for="product-nf-number">Número da Nota Fiscal (NF-e)</label>
+              <input type="text" id="product-nf-number" class="form-control" placeholder="Ex: 44821">
+            </div>
+
+            <div class="form-group">
+              <label for="product-nf-series">Série da NF</label>
+              <input type="text" id="product-nf-series" class="form-control" placeholder="Ex: 1">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="product-nf-key">Chave de Acesso da NF-e (44 dígitos)</label>
+              <input type="text" id="product-nf-key" class="form-control" maxlength="44" placeholder="Ex: 35260812345678000195550010000448211001234567">
+            </div>
+
+            <div class="form-group">
+              <label for="product-nf-date">Data de Emissão da NF</label>
+              <input type="date" id="product-nf-date" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label for="product-nf-total">Valor Total da NF (R$)</label>
+              <input type="number" id="product-nf-total" class="form-control" min="0" step="0.01" placeholder="Ex: 18500.00">
+            </div>
+
+            <div class="form-group">
+              <label for="product-nf-cnpj">CNPJ do Emitente / Fornecedor</label>
+              <input type="text" id="product-nf-cnpj" class="form-control" placeholder="Ex: 12.345.678/0001-90">
+            </div>
+
+            <div class="form-group">
+              <label for="product-nf-link">Link / Arquivo do Documento (PDF/XML)</label>
+              <input type="text" id="product-nf-link" class="form-control" placeholder="Ex: https://drive.google.com/file/d/...">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="product-nf-notes">Observações Fiscais / Lote</label>
+              <textarea id="product-nf-notes" class="form-control" rows="2" placeholder="Ex: Compra de lote para contrato de outsourcing"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeProductModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Produto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: STOCK MOVEMENT (ENTRADA / SAÍDA) -->
+  <div class="modal-backdrop" id="transaction-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Registrar Movimentação de Estoque</h3>
+        <button class="close-btn" onclick="closeTransactionModal()">&times;</button>
+      </div>
+      <form id="transaction-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="tx-product">Produto *</label>
+            <select id="tx-product" class="form-control" required>
+              <!-- Populated via JS -->
+            </select>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="tx-type">Tipo de Movimentação *</label>
+              <select id="tx-type" class="form-control" required>
+                <option value="IN">🟢 ENTRADA (Reposição)</option>
+                <option value="OUT">🔴 SAÍDA (Venda / Baixa)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="tx-quantity">Quantidade *</label>
+              <input type="number" id="tx-quantity" class="form-control" min="1" value="1" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="tx-reason">Motivo / Justificativa</label>
+            <input type="text" id="tx-reason" class="form-control" placeholder="Ex: Compra NF 1024 ou Venda balcão">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeTransactionModal()">Cancelar</button>
+          <button type="submit" class="btn btn-success">Confirmar Movimentação</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT TRANSACTION -->
+  <div class="modal-backdrop" id="edit-transaction-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Editar Movimentação de Estoque</h3>
+        <button class="close-btn" onclick="window.closeEditTransactionModal()">&times;</button>
+      </div>
+      <form id="edit-transaction-form">
+        <div class="modal-body">
+          <input type="hidden" id="edit-tx-id">
+
+          <div class="form-group">
+            <label>Produto</label>
+            <input type="text" id="edit-tx-product-name" class="form-control" readonly style="opacity: 0.8; background: var(--bg-card); cursor: not-allowed;">
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="edit-tx-type">Tipo de Movimentação *</label>
+              <select id="edit-tx-type" class="form-control" required>
+                <option value="IN">🟢 ENTRADA (Reposição)</option>
+                <option value="OUT">🔴 SAÍDA (Venda / Baixa)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="edit-tx-quantity">Quantidade Movimentada *</label>
+              <input type="number" id="edit-tx-quantity" class="form-control" min="1" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-tx-reason">Motivo / Justificativa *</label>
+            <input type="text" id="edit-tx-reason" class="form-control" required placeholder="Ex: Ajuste de estoque ou NF 4482">
+          </div>
+
+          <div class="form-group">
+            <label for="edit-tx-user">Usuário Responsável *</label>
+            <input type="text" id="edit-tx-user" class="form-control" required placeholder="Ex: Ana Beatriz (Compras)">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeEditTransactionModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD SUPPLIER -->
+  <div class="modal-backdrop" id="supplier-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Cadastrar Novo Fornecedor</h3>
+        <button class="close-btn" onclick="window.closeSupplierModal()">&times;</button>
+      </div>
+      <form id="supplier-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="supplier-name">Razão Social / Nome do Fornecedor *</label>
+            <input type="text" id="supplier-name" class="form-control" required placeholder="Ex: TechDistribuidora S.A.">
+          </div>
+
+          <div class="form-group">
+            <label for="supplier-contact">Pessoa de Contato</label>
+            <input type="text" id="supplier-contact" class="form-control" placeholder="Ex: Carlos Silva">
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="supplier-email">E-mail de Contato</label>
+              <input type="email" id="supplier-email" class="form-control" placeholder="contato@empresa.com">
+            </div>
+
+            <div class="form-group">
+              <label for="supplier-phone">Telefone / WhatsApp</label>
+              <input type="text" id="supplier-phone" class="form-control" placeholder="(11) 99999-9999">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeSupplierModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Fornecedor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EMAIL CRITICAL REPORT -->
+  <div class="modal-backdrop" id="email-report-modal">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 0.5rem;">📧 Relatório de Reposição de Produtos Críticos</h3>
+        <button class="close-btn" onclick="window.closeEmailReportModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="email-target">E-mail do Destinatário *</label>
+          <input type="email" id="email-target" class="form-control" value="out.logistica!@iatr.com.br" placeholder="destinatario@empresa.com">
+        </div>
+
+        <div class="form-group">
+          <label for="email-subject">Assunto do E-mail</label>
+          <input type="text" id="email-subject" class="form-control" value="[ALERTA REPOSIÇÃO] Relatório de Produtos Críticos / Esgotados - StockMaster">
+        </div>
+
+        <div class="form-group">
+          <label for="email-body-preview">Conteúdo do Relatório Sintético (Pronto para envio)</label>
+          <textarea id="email-body-preview" class="form-control" rows="10" readonly style="font-family: monospace; font-size: 0.8rem; background: var(--bg-card); line-height: 1.4; color: var(--text-main);"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="flex-wrap: wrap; gap: 0.5rem; justify-content: space-between;">
+        <button type="button" class="btn btn-secondary" onclick="window.copyReportToClipboard()">
+          <i data-lucide="copy"></i> Copiar Texto
+        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="window.closeEmailReportModal()">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="window.sendReportViaMailto()">
+            <i data-lucide="send"></i> Abrir E-mail (Outlook / Gmail)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PRODUCT INVENTORY TAGS (INV) -->
+  <div class="modal-backdrop" id="inv-tags-modal">
+    <div class="modal-card" style="max-width: 780px;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 0.85rem;">
+          <img src="./assets/logo.png" alt="IA TECNOLOGIA" style="height: 38px; object-fit: contain; background: #ffffff; padding: 4px 8px; border-radius: var(--radius-sm);">
+          <div>
+            <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+              🏷️ Etiquetas de Inventário Patrimonial (INV)
+            </h3>
+            <p id="inv-modal-subtitle" style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+              IA TECNOLOGIA • Código individual para cada unidade física em estoque
+            </p>
+          </div>
+        </div>
+        <button class="close-btn" onclick="window.closeInvTagsModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; background: rgba(15, 23, 42, 0.4); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+          <div>
+            <div id="inv-modal-prod-name" style="font-weight: 700; font-size: 1.05rem; color: var(--text-main);">-</div>
+            <div id="inv-modal-prod-meta" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;">-</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-sm btn-secondary" onclick="window.copyAllInvTagsToClipboard()">
+              <i data-lucide="copy"></i> Copiar Todos
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="window.printInvTagsLabels()">
+              <i data-lucide="printer"></i> Imprimir Etiquetas
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <input type="text" id="inv-tags-search-input" oninput="window.filterInvModalList()" class="form-control" placeholder="🔍 Filtrar número de inventário específico (ex: INV-000025)..." style="font-size: 0.85rem;">
+        </div>
+
+        <div id="inv-modal-tags-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 0.75rem; max-height: 340px; overflow-y: auto; padding: 0.25rem;">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="window.closeInvTagsModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINTABLE INV LABELS CONTAINER SHEET -->
+  <div id="printable-inv-sheet" class="printable-inv-sheet"></div>
+
+  <!-- App Script -->
+  <script src="js/app.js"></script>
+</body>
+</html>
