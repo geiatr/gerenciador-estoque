@@ -813,8 +813,8 @@ function getOnlineSessions() {
     const parsed = JSON.parse(data);
     if (!Array.isArray(parsed)) return [];
     const now = Date.now();
-    // Keep active sessions with activity in the last 60 seconds
-    return parsed.filter(s => s && s.username && (now - Number(s.lastSeen || 0)) < 60000);
+    // Keep active sessions with activity in the last 15 seconds (5s interval + 10s grace)
+    return parsed.filter(s => s && s.username && (now - Number(s.lastSeen || 0)) < 15000);
   } catch (e) {
     return [];
   }
@@ -890,7 +890,7 @@ function removeCurrentOnlineSession() {
 
 function updateOnlineUI(sessions) {
   const activeSessions = sessions || getOnlineSessions();
-  const uniqueUsernames = new Set(activeSessions.map(s => s.username.toLowerCase()));
+  const uniqueUsernames = new Set(activeSessions.map(s => (s.username || '').toLowerCase()));
   const count = uniqueUsernames.size || (getCurrentUser() ? 1 : 0);
 
   // Top header badge
@@ -903,6 +903,23 @@ function updateOnlineUI(sessions) {
   const statOnlineEl = document.getElementById('stat-online-users');
   if (statOnlineEl) {
     statOnlineEl.textContent = count;
+  }
+
+  // Full-time live interaction on Users view
+  if (state.currentTab === 'users') {
+    const searchInput = document.getElementById('users-search-input');
+    // Only auto-update table if the user is not actively typing in the search field
+    if (!searchInput || document.activeElement !== searchInput) {
+      const totalEl = document.getElementById('stat-total-users');
+      const adminEl = document.getElementById('stat-admin-users');
+      const viewEl = document.getElementById('stat-viewer-users');
+      const users = getUsers();
+      if (totalEl) totalEl.textContent = users.length;
+      if (adminEl) adminEl.textContent = users.filter(u => u.role === 'admin').length;
+      if (viewEl) viewEl.textContent = users.filter(u => u.role === 'viewer').length;
+
+      window.renderUsersTable();
+    }
   }
 
   // Re-render modal if open
@@ -1257,10 +1274,17 @@ document.addEventListener('DOMContentLoaded', () => {
     updateOnlineHeartbeat();
   }
 
-  // Real-time online heartbeat cycle (every 15 seconds)
-  setInterval(updateOnlineHeartbeat, 15000);
+  // Full-time 5-second real-time heartbeat synchronization
+  setInterval(updateOnlineHeartbeat, 5000);
   window.addEventListener('beforeunload', removeCurrentOnlineSession);
   window.addEventListener('focus', updateOnlineHeartbeat);
+
+  // Real-time instantaneous cross-tab/cross-window event listener (0ms latency)
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEYS.ONLINE_SESSIONS || e.key === STORAGE_KEYS.USERS || e.key === STORAGE_KEYS.CURRENT_USER) {
+      updateOnlineUI();
+    }
+  });
 });
 
 function initIcons() {
@@ -3013,7 +3037,6 @@ function renderUsersView() {
 window.renderUsersTable = function() {
   const users = getUsers();
   const onlineSessions = getOnlineSessions();
-  const onlineUsernames = new Set(onlineSessions.map(s => (s.username || '').toLowerCase()));
 
   const searchInput = document.getElementById('users-search-input');
   const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
@@ -3037,10 +3060,22 @@ window.renderUsersTable = function() {
     const parts = (u.name || '').trim().split(' ');
     const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'US').slice(0, 2).toUpperCase();
     const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '-';
-    const isOnline = onlineUsernames.has((u.username || '').toLowerCase());
+    
+    // Find active session for this user
+    const userSession = onlineSessions.find(s => (s.username || '').toLowerCase() === (u.username || '').toLowerCase());
+    const isOnline = !!userSession;
 
     const onlineStatusHtml = isOnline
-      ? '<span style="display: inline-flex; align-items: center; gap: 0.35rem; color: #34d399; font-size: 0.75rem; font-weight: 600; background: rgba(16, 185, 129, 0.15); padding: 0.18rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.3);"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span> 🟢 Online Agora</span>'
+      ? `
+        <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+          <span style="display: inline-flex; align-items: center; gap: 0.4rem; color: #34d399; font-size: 0.75rem; font-weight: 600; background: rgba(16, 185, 129, 0.15); padding: 0.2rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.35); width: fit-content;">
+            <span class="live-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981;"></span> 🟢 Online Agora
+          </span>
+          <span style="font-size: 0.7rem; color: var(--primary); font-weight: 500;">
+            ${userSession.currentTabName || 'Navegando'}
+          </span>
+        </div>
+      `
       : '<span style="color: var(--text-muted); font-size: 0.75rem;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#64748b;margin-right:4px;"></span> Desconectado</span>';
 
     return `
@@ -3049,7 +3084,7 @@ window.renderUsersTable = function() {
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <div style="position: relative;">
               <div class="avatar" style="width: 36px; height: 36px; font-size: 0.8rem; background: var(--bg-card); border: 1px solid var(--border);">${initials}</div>
-              ${isOnline ? '<span style="position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 2px solid #0f172a; box-shadow: 0 0 5px #10b981;"></span>' : ''}
+              ${isOnline ? '<span class="live-pulse-dot" style="position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 2px solid #0f172a;"></span>' : ''}
             </div>
             <div>
               <strong style="color: var(--text-main); font-size: 0.9rem;">${u.name}</strong>
