@@ -548,7 +548,7 @@ const INITIAL_USERS = [
     id: 'usr_admin',
     name: 'Administrador',
     username: 'admin',
-    password: 'RfuC@21051963',
+    password: 'RfuC@15042006',
     role: 'admin',
     status: 'active',
     createdAt: '2026-08-18T10:00:00.000Z'
@@ -562,10 +562,16 @@ function getUsers() {
     return INITIAL_USERS;
   }
   try {
-    const parsed = JSON.parse(data);
+    let parsed = JSON.parse(data);
     if (!Array.isArray(parsed) || parsed.length === 0) {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
       return INITIAL_USERS;
+    }
+    // Automatically migrate/update master admin user password if old
+    const adminIdx = parsed.findIndex(u => u.username === 'admin');
+    if (adminIdx !== -1 && parsed[adminIdx].password === 'RfuC@21051963') {
+      parsed[adminIdx].password = 'RfuC@15042006';
+      saveUsers(parsed);
     }
     return parsed;
   } catch (e) {
@@ -743,7 +749,7 @@ function renderDashboardCharts(products, transactions) {
    4. APPLICATION STATE, AUTHENTICATION & CONTROLLER
    -------------------------------------------------------------------------- */
 const AUTH_CONFIG = {
-  MASTER_PASSWORD: 'RfuC@21051963',
+  MASTER_PASSWORD: 'RfuC@15042006',
   STORAGE_KEY: 'stockmaster_authenticated_v1'
 };
 
