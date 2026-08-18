@@ -552,6 +552,15 @@ const INITIAL_USERS = [
     role: 'admin',
     status: 'active',
     createdAt: '2026-08-18T10:00:00.000Z'
+  },
+  {
+    id: 'usr_default',
+    name: 'Usuário Consulta',
+    username: 'usuario',
+    password: 'user123',
+    role: 'viewer',
+    status: 'active',
+    createdAt: '2026-08-18T10:00:00.000Z'
   }
 ];
 
@@ -906,8 +915,107 @@ window.handleLoginSubmit = function(e) {
   if (window.showToast) window.showToast(`🟢 Bem-vindo(a), ${matchedUser.name}!`, 'success');
 };
 
-window.toggleAuthPasswordVisibility = function() {
-  const passwordInput = document.getElementById('auth-password');
+window.switchAuthTab = function(tab) {
+  const tabLogin = document.getElementById('tab-auth-login');
+  const tabRegister = document.getElementById('tab-auth-register');
+  const formLogin = document.getElementById('auth-form-login');
+  const formRegister = document.getElementById('auth-form-register');
+  const loginErr = document.getElementById('auth-error-msg');
+  const regErr = document.getElementById('reg-error-msg');
+
+  if (loginErr) loginErr.style.display = 'none';
+  if (regErr) regErr.style.display = 'none';
+
+  if (tab === 'login') {
+    if (tabLogin) { tabLogin.style.background = 'var(--primary)'; tabLogin.style.color = '#fff'; }
+    if (tabRegister) { tabRegister.style.background = 'transparent'; tabRegister.style.color = 'var(--text-muted)'; }
+    if (formLogin) formLogin.style.display = 'block';
+    if (formRegister) formRegister.style.display = 'none';
+    const userField = document.getElementById('auth-username');
+    if (userField) userField.focus();
+  } else {
+    if (tabLogin) { tabLogin.style.background = 'transparent'; tabLogin.style.color = 'var(--text-muted)'; }
+    if (tabRegister) { tabRegister.style.background = 'var(--primary)'; tabRegister.style.color = '#fff'; }
+    if (formLogin) formLogin.style.display = 'none';
+    if (formRegister) formRegister.style.display = 'block';
+    const nameField = document.getElementById('reg-name');
+    if (nameField) nameField.focus();
+  }
+};
+
+window.handleRegisterSubmit = function(e) {
+  if (e) e.preventDefault();
+  const nameInput = document.getElementById('reg-name');
+  const usernameInput = document.getElementById('reg-username');
+  const pwdInput = document.getElementById('reg-password');
+  const pwdConfirmInput = document.getElementById('reg-password-confirm');
+  const errorMsg = document.getElementById('reg-error-msg');
+
+  const name = nameInput ? nameInput.value.trim() : '';
+  const username = usernameInput ? usernameInput.value.trim().toLowerCase() : '';
+  const pwd = pwdInput ? pwdInput.value : '';
+  const pwdConfirm = pwdConfirmInput ? pwdConfirmInput.value : '';
+
+  const showError = (msg) => {
+    if (errorMsg) {
+      errorMsg.style.display = 'block';
+      errorMsg.textContent = '⚠️ ' + msg;
+    }
+  };
+
+  if (!name || !username) {
+    showError('Preencha seu Nome e o Nome de Usuário desejado.');
+    return;
+  }
+
+  if (username === 'admin') {
+    showError('O login "admin" é reservado para o Administrador Master.');
+    return;
+  }
+
+  if (!pwd || pwd.length < 4) {
+    showError('A senha criada deve ter no mínimo 4 caracteres.');
+    return;
+  }
+
+  if (pwd !== pwdConfirm) {
+    showError('A confirmação da senha não confere!');
+    return;
+  }
+
+  const users = getUsers();
+  const alreadyExists = users.some(u => u.username.toLowerCase() === username);
+  if (alreadyExists) {
+    showError(`O usuário "${username}" já está cadastrado. Escolha outro nome.`);
+    return;
+  }
+
+  const newUser = {
+    id: 'usr_' + Date.now(),
+    name: name,
+    username: username,
+    password: pwd,
+    role: 'viewer', // Automatic read-only / consulta mode
+    status: 'active',
+    createdAt: new Date().toISOString()
+  };
+
+  users.push(newUser);
+  saveUsers(users);
+
+  // Auto login with new user
+  setCurrentUser(newUser);
+  if (errorMsg) errorMsg.style.display = 'none';
+  checkAuthentication();
+  renderApp();
+
+  if (window.showToast) {
+    window.showToast(`🟢 Cadastro realizado com sucesso! Bem-vindo(a), ${newUser.name}!`, 'success');
+  }
+};
+
+window.toggleAuthPasswordVisibility = function(fieldId = 'auth-password') {
+  const passwordInput = document.getElementById(fieldId);
   if (!passwordInput) return;
   passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
 };
@@ -918,6 +1026,7 @@ window.handleLogout = function() {
   const passwordInput = document.getElementById('auth-password');
   if (passwordInput) passwordInput.value = '';
   if (usernameInput) usernameInput.value = '';
+  window.switchAuthTab('login');
   checkAuthentication();
   if (window.showToast) window.showToast('🔒 Sessão encerrada com sucesso.', 'info');
 };
