@@ -202,7 +202,7 @@
               <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Visão Geral do Dashboard">
                 <i data-lucide="printer"></i> Imprimir
               </button>
-              <button class="btn btn-secondary" onclick="window.triggerImportFile()" title="Importar planilha Excel (.xlsx / .csv)">
+              <button class="btn btn-secondary admin-only" onclick="window.triggerImportFile()" title="Importar planilha Excel (.xlsx / .csv)">
                 <i data-lucide="upload"></i> Importar Excel (.xlsx)
               </button>
               <button class="btn btn-secondary" onclick="window.exportInventoryExcel()" title="Exportar planilha Excel (.xlsx)">
@@ -310,7 +310,7 @@
             <div class="chart-card">
               <div class="chart-header" style="display: flex; align-items: center; justify-content: space-between;">
                 <h3>Últimas Atividades</h3>
-                <button class="btn btn-sm btn-secondary" onclick="window.clearActivityHistory()" title="Apagar Histórico de Atividades" style="color: var(--danger); font-size: 0.75rem;">
+                <button class="btn btn-sm btn-secondary admin-only" onclick="window.clearActivityHistory()" title="Apagar Histórico de Atividades" style="color: var(--danger); font-size: 0.75rem;">
                   <i data-lucide="trash-2"></i> Limpar
                 </button>
               </div>
@@ -333,10 +333,10 @@
               <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Tabela de Inventário">
                 <i data-lucide="printer"></i> Imprimir
               </button>
-              <button class="btn btn-secondary" onclick="window.triggerImportFile()" title="Importar planilha Excel (.xlsx / .csv)">
+              <button class="btn btn-secondary admin-only" onclick="window.triggerImportFile()" title="Importar planilha Excel (.xlsx / .csv)">
                 <i data-lucide="upload"></i> Importar Excel (.xlsx)
               </button>
-              <button class="btn btn-primary" onclick="openAddProductModal()">
+              <button class="btn btn-primary admin-only" onclick="openAddProductModal()">
                 <i data-lucide="plus"></i> Cadastrar Produto
               </button>
             </div>
@@ -409,13 +409,13 @@
               <p>Registro auditável de todas as entradas e saídas de mercadorias.</p>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-              <button class="btn btn-secondary" onclick="window.clearActivityHistory()" title="Apagar Histórico de Atividades e Movimentações" style="color: var(--danger);">
+              <button class="btn btn-secondary admin-only" onclick="window.clearActivityHistory()" title="Apagar Histórico de Atividades e Movimentações" style="color: var(--danger);">
                 <i data-lucide="trash-2"></i> Limpar Histórico
               </button>
               <button class="btn btn-secondary" onclick="window.printCurrentView()" title="Imprimir Histórico de Movimentações">
                 <i data-lucide="printer"></i> Imprimir
               </button>
-              <button class="btn btn-success" onclick="openTransactionModal()">
+              <button class="btn btn-success admin-only" onclick="openTransactionModal()">
                 <i data-lucide="plus-circle"></i> Registrar Nova Movimentação
               </button>
             </div>
@@ -1038,9 +1038,8 @@
             <div class="form-group">
               <label for="user-role">Perfil de Acesso *</label>
               <select id="user-role" class="form-control" required>
-                <option value="admin">Administrador (Acesso Total)</option>
-                <option value="operator" selected>Operador (Estoque & Movimentações)</option>
-                <option value="viewer">Visualizador (Somente Consulta)</option>
+                <option value="viewer" selected>👁️ Usuário (Somente Consulta / Leitura)</option>
+                <option value="admin">🛡️ Administrador (Acesso Total & Edição)</option>
               </select>
             </div>
           </div>
