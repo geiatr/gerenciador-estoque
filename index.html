@@ -35,21 +35,32 @@
       </div>
 
       <h2 style="font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;">StockMaster Enterprise</h2>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">
-        🔒 Acesso Restrito • Digite seu usuário e senha para entrar no sistema.
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        🔒 Acesso ao Sistema de Gestão e Estoque
       </p>
 
-      <form id="auth-form" onsubmit="window.handleLoginSubmit(event)">
+      <!-- Auth Mode Switcher Tabs -->
+      <div style="display: flex; background: rgba(0,0,0,0.3); padding: 4px; border-radius: var(--radius-md); margin-bottom: 1.25rem; border: 1px solid var(--border);">
+        <button type="button" id="tab-auth-login" onclick="window.switchAuthTab('login')" style="flex: 1; padding: 0.5rem; font-size: 0.85rem; font-weight: 600; border: none; border-radius: var(--radius-sm); cursor: pointer; background: var(--primary); color: #fff; transition: all 0.2s;">
+          🔑 Fazer Login
+        </button>
+        <button type="button" id="tab-auth-register" onclick="window.switchAuthTab('register')" style="flex: 1; padding: 0.5rem; font-size: 0.85rem; font-weight: 600; border: none; border-radius: var(--radius-sm); cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">
+          ✍️ Criar Novo Acesso
+        </button>
+      </div>
+
+      <!-- FORM 1: LOGIN -->
+      <form id="auth-form-login" onsubmit="window.handleLoginSubmit(event)">
         <div class="form-group" style="text-align: left; margin-bottom: 1rem;">
           <label for="auth-username" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Usuário / Login *</label>
-          <input type="text" id="auth-username" class="form-control" placeholder="Ex: admin ou seu usuário" required style="font-size: 0.95rem; margin-top: 0.35rem;" autofocus>
+          <input type="text" id="auth-username" class="form-control" placeholder="Seu usuário ou admin" required style="font-size: 0.95rem; margin-top: 0.35rem;" autofocus>
         </div>
 
         <div class="form-group" style="text-align: left; margin-bottom: 1.25rem;">
           <label for="auth-password" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Senha *</label>
           <div style="position: relative; margin-top: 0.35rem;">
             <input type="password" id="auth-password" class="form-control" placeholder="Sua senha de acesso..." required style="padding-right: 2.75rem; font-size: 0.95rem;">
-            <button type="button" onclick="window.toggleAuthPasswordVisibility()" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar Senha">
+            <button type="button" onclick="window.toggleAuthPasswordVisibility('auth-password')" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar Senha">
               👁️
             </button>
           </div>
@@ -62,6 +73,48 @@
         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 0.95rem; font-weight: 600; justify-content: center; display: flex; align-items: center; gap: 0.5rem;">
           <i data-lucide="lock"></i> Entrar no Sistema
         </button>
+
+        <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
+          Não tem uma conta? <a href="javascript:void(0)" onclick="window.switchAuthTab('register')" style="color: var(--primary); text-decoration: underline; font-weight: 600;">Criar meu acesso agora</a>
+        </div>
+      </form>
+
+      <!-- FORM 2: REGISTER / CREATE ACCOUNT -->
+      <form id="auth-form-register" onsubmit="window.handleRegisterSubmit(event)" style="display: none;">
+        <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
+          <label for="reg-name" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Seu Nome Completo *</label>
+          <input type="text" id="reg-name" class="form-control" placeholder="Ex: Carlos Silva" required style="font-size: 0.9rem; margin-top: 0.25rem;">
+        </div>
+
+        <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
+          <label for="reg-username" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Criar Login / Nome de Usuário *</label>
+          <input type="text" id="reg-username" class="form-control" placeholder="Ex: carlos.silva ou usuario1" required style="font-size: 0.9rem; margin-top: 0.25rem;">
+        </div>
+
+        <div class="form-group" style="text-align: left; margin-bottom: 0.85rem;">
+          <label for="reg-password" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Criar Senha *</label>
+          <div style="position: relative; margin-top: 0.25rem;">
+            <input type="password" id="reg-password" class="form-control" placeholder="Mínimo 4 caracteres..." required minlength="4" style="padding-right: 2.75rem; font-size: 0.9rem;">
+            <button type="button" onclick="window.toggleAuthPasswordVisibility('reg-password')" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar Senha">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group" style="text-align: left; margin-bottom: 1.25rem;">
+          <label for="reg-password-confirm" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Confirmar Senha *</label>
+          <input type="password" id="reg-password-confirm" class="form-control" placeholder="Repita a senha criada..." required minlength="4" style="font-size: 0.9rem; margin-top: 0.25rem;">
+        </div>
+
+        <div id="reg-error-msg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #f87171; padding: 0.6rem; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 1.25rem;"></div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 0.95rem; font-weight: 600; justify-content: center; display: flex; align-items: center; gap: 0.5rem; background: var(--success); border-color: var(--success);">
+          <i data-lucide="user-check"></i> Cadastrar e Entrar
+        </button>
+
+        <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
+          Já possui usuário cadastrado? <a href="javascript:void(0)" onclick="window.switchAuthTab('login')" style="color: var(--primary); text-decoration: underline; font-weight: 600;">Fazer Login</a>
+        </div>
       </form>
 
       <div style="font-size: 0.725rem; color: var(--text-dark); margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 0.85rem;">
