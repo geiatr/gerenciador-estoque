@@ -335,20 +335,54 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'stockmaster_transactions_v8',
   USERS: 'stockmaster_users_v1',
   CURRENT_USER: 'stockmaster_current_user_v1',
-  ONLINE_SESSIONS: 'stockmaster_online_sessions_v2'
+  ONLINE_SESSIONS: 'stockmaster_online_sessions_v2',
+  INV_CONFIG: 'stockmaster_inv_config_v1'
 };
 
+function getInvConfig() {
+  const defaultCfg = {
+    prefix: 'INV',
+    separator: '-',
+    digits: 6,
+    startNumber: 1,
+    suffix: ''
+  };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.INV_CONFIG);
+    if (!raw) return defaultCfg;
+    const parsed = JSON.parse(raw);
+    return { ...defaultCfg, ...(parsed || {}) };
+  } catch (e) {
+    return defaultCfg;
+  }
+}
+
+function saveInvConfig(cfg) {
+  localStorage.setItem(STORAGE_KEYS.INV_CONFIG, JSON.stringify(cfg));
+}
+
+function formatInvCode(num, cfg) {
+  const c = cfg || getInvConfig();
+  const prefix = (c.prefix || 'INV').trim();
+  const sep = c.separator !== undefined ? c.separator : '-';
+  const digits = Math.max(3, Math.min(10, Number(c.digits) || 6));
+  const numStr = String(num).padStart(digits, '0');
+  const suffix = (c.suffix || '').trim();
+  return `${prefix}${sep}${numStr}${suffix}`;
+}
+
 function ensureInventoryCodes(products) {
+  const cfg = getInvConfig();
   let invCounter = 1;
   let modified = false;
 
   products.forEach(p => {
     if (Array.isArray(p.inventoryCodes)) {
       p.inventoryCodes.forEach(code => {
-        const match = String(code).match(/INV-(\d+)/i);
+        const match = String(code).match(/(\d+)/g);
         if (match) {
-          const val = parseInt(match[1], 10);
-          if (val >= invCounter) invCounter = val + 1;
+          const lastNum = parseInt(match[match.length - 1], 10);
+          if (lastNum >= invCounter) invCounter = lastNum + 1;
         }
       });
     }
@@ -362,7 +396,7 @@ function ensureInventoryCodes(products) {
       modified = true;
       const needed = qty - codes.length;
       for (let i = 0; i < needed; i++) {
-        const codeStr = `INV-${String(invCounter).padStart(6, '0')}`;
+        const codeStr = formatInvCode(invCounter, cfg);
         codes.push(codeStr);
         invCounter++;
       }
@@ -2940,15 +2974,227 @@ window.filterInvModalList = function() {
   grid.innerHTML = filtered.map((code) => {
     const originalIndex = codes.indexOf(code) + 1;
     return `
-      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.6rem; text-align: center; font-family: monospace;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.65rem 0.6rem; text-align: center; font-family: monospace;">
         <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Unidade #${originalIndex}</div>
-        <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0.25rem 0;">${code}</div>
-        <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${code}'); window.showNotification ? window.showNotification('Código ${code} copiado!', 'success') : alert('Código ${code} copiado!');" style="font-size: 0.65rem; padding: 0.15rem 0.4rem; width: 100%;">
-          📋 Copiar
-        </button>
+        <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0.35rem 0; word-break: break-all;">${code}</div>
+        <div style="display: flex; gap: 0.3rem; margin-top: 0.35rem;">
+          <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${code}'); if(window.showToast) window.showToast('Código copiado!', 'success'); else alert('Copiado!');" style="font-size: 0.65rem; padding: 0.15rem 0.35rem; flex: 1;" title="Copiar Código">
+            📋 Copiar
+          </button>
+          <button class="btn btn-sm btn-secondary" onclick="window.openEditSingleTagModal('${code}')" style="font-size: 0.65rem; padding: 0.15rem 0.35rem; flex: 1; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" title="Editar individualmente este código">
+            ✏️ Editar
+          </button>
+        </div>
       </div>
     `;
   }).join('');
+
+  setTimeout(initIcons, 50);
+};
+
+/* --------------------------------------------------------------------------
+   CONFIGURABLE INV PATTERN & CUSTOM TAGS ENGINE
+   -------------------------------------------------------------------------- */
+window.openInvConfigModal = function() {
+  const cfg = getInvConfig();
+  const prefixEl = document.getElementById('inv-config-prefix');
+  const sepEl = document.getElementById('inv-config-separator');
+  const digitsEl = document.getElementById('inv-config-digits');
+  const suffixEl = document.getElementById('inv-config-suffix');
+  const checkAllEl = document.getElementById('inv-config-apply-all-checkbox');
+
+  if (prefixEl) prefixEl.value = cfg.prefix || 'INV';
+  if (sepEl) sepEl.value = cfg.separator !== undefined ? cfg.separator : '-';
+  if (digitsEl) digitsEl.value = String(cfg.digits || 6);
+  if (suffixEl) suffixEl.value = cfg.suffix || '';
+  if (checkAllEl) checkAllEl.checked = false;
+
+  window.updateInvConfigPreview();
+  const modal = document.getElementById('inv-config-modal');
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeInvConfigModal = function() {
+  const modal = document.getElementById('inv-config-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.updateInvConfigPreview = function() {
+  const prefix = (document.getElementById('inv-config-prefix')?.value || 'INV').trim();
+  const sep = document.getElementById('inv-config-separator')?.value ?? '-';
+  const digits = Number(document.getElementById('inv-config-digits')?.value || 6);
+  const suffix = (document.getElementById('inv-config-suffix')?.value || '').trim();
+
+  const previewEl = document.getElementById('inv-config-live-preview');
+  if (previewEl) {
+    const numStr = String(1).padStart(digits, '0');
+    previewEl.textContent = `${prefix}${sep}${numStr}${suffix}`;
+  }
+};
+
+window.handleSaveInvConfig = function(e) {
+  if (e) e.preventDefault();
+  const prefix = (document.getElementById('inv-config-prefix')?.value || 'INV').trim();
+  const sep = document.getElementById('inv-config-separator')?.value ?? '-';
+  const digits = Number(document.getElementById('inv-config-digits')?.value || 6);
+  const suffix = (document.getElementById('inv-config-suffix')?.value || '').trim();
+  const applyAll = document.getElementById('inv-config-apply-all-checkbox')?.checked;
+
+  const newCfg = { prefix, separator: sep, digits, suffix };
+  saveInvConfig(newCfg);
+
+  if (applyAll) {
+    // Regenerate all products' codes according to the new pattern
+    const products = getProducts();
+    let counter = 1;
+    const updated = products.map(p => {
+      const qty = Math.max(0, Number(p.quantity) || 0);
+      const newCodes = [];
+      for (let i = 0; i < qty; i++) {
+        newCodes.push(formatInvCode(counter, newCfg));
+        counter++;
+      }
+      return { ...p, inventoryCodes: newCodes };
+    });
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updated));
+    showToast('✨ Padrão salvo e todos os códigos de estoque foram reformatados!', 'success');
+  } else if (currentInvModalProductId) {
+    // Reformat current product
+    const products = getProducts();
+    const pIdx = products.findIndex(p => p.id === currentInvModalProductId);
+    if (pIdx !== -1) {
+      const p = products[pIdx];
+      const qty = Math.max(0, Number(p.quantity) || 0);
+      const newCodes = [];
+      for (let i = 0; i < qty; i++) {
+        newCodes.push(formatInvCode(i + 1, newCfg));
+      }
+      products[pIdx].inventoryCodes = newCodes;
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+      showToast('✨ Padrão salvo e aplicado ao produto atual!', 'success');
+    }
+  } else {
+    showToast('✨ Novo padrão de numeração salvo com sucesso!', 'success');
+  }
+
+  window.closeInvConfigModal();
+  window.filterInvModalList();
+  if (window.renderLabelSheetPreview) window.renderLabelSheetPreview();
+  renderApp();
+};
+
+/* Single Code Edit */
+window.openEditSingleTagModal = function(code) {
+  const oldCodeEl = document.getElementById('inv-edit-old-code');
+  const newCodeEl = document.getElementById('inv-edit-new-code');
+  if (oldCodeEl) oldCodeEl.value = code;
+  if (newCodeEl) {
+    newCodeEl.value = code;
+    setTimeout(() => newCodeEl.focus(), 100);
+  }
+  const modal = document.getElementById('inv-edit-single-modal');
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeEditSingleTagModal = function() {
+  const modal = document.getElementById('inv-edit-single-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.handleSaveSingleTagCode = function(e) {
+  if (e) e.preventDefault();
+  if (!currentInvModalProductId) return;
+  const oldCode = document.getElementById('inv-edit-old-code')?.value;
+  const newCode = (document.getElementById('inv-edit-new-code')?.value || '').trim();
+
+  if (!newCode) {
+    showToast('Informe o novo código.', 'warning');
+    return;
+  }
+
+  const products = getProducts();
+  const pIdx = products.findIndex(p => p.id === currentInvModalProductId);
+  if (pIdx === -1) return;
+
+  const product = products[pIdx];
+  const codes = product.inventoryCodes || [];
+  const cIdx = codes.indexOf(oldCode);
+
+  if (cIdx === -1) {
+    showToast('Código original não encontrado.', 'danger');
+    return;
+  }
+
+  codes[cIdx] = newCode;
+  products[pIdx].inventoryCodes = codes;
+  localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+
+  showToast(`🏷️ Código atualizado para "${newCode}"!`, 'success');
+  window.closeEditSingleTagModal();
+  window.filterInvModalList();
+  if (window.renderLabelSheetPreview) window.renderLabelSheetPreview();
+};
+
+/* Product Specific Renumbering */
+window.openRenumberProductModal = function() {
+  if (!currentInvModalProductId) return;
+  const product = getProductById(currentInvModalProductId);
+  if (!product) return;
+
+  const subtitle = document.getElementById('inv-renumber-prod-subtitle');
+  const prefixInput = document.getElementById('inv-renumber-prefix');
+  const startInput = document.getElementById('inv-renumber-start');
+
+  if (subtitle) subtitle.textContent = `Produto: ${product.name} (${product.quantity} unidades em estoque)`;
+  if (prefixInput) {
+    const cleanSku = (product.sku || 'PROD').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4);
+    prefixInput.value = `IAT-${cleanSku}-`;
+  }
+  if (startInput) startInput.value = '1';
+
+  const modal = document.getElementById('inv-renumber-product-modal');
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeRenumberProductModal = function() {
+  const modal = document.getElementById('inv-renumber-product-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.handleRenumberProductSubmit = function(e) {
+  if (e) e.preventDefault();
+  if (!currentInvModalProductId) return;
+  const prefix = (document.getElementById('inv-renumber-prefix')?.value || '').trim();
+  const startNum = Math.max(1, parseInt(document.getElementById('inv-renumber-start')?.value, 10) || 1);
+
+  if (!prefix) {
+    showToast('Informe o prefixo para este produto.', 'warning');
+    return;
+  }
+
+  const products = getProducts();
+  const pIdx = products.findIndex(p => p.id === currentInvModalProductId);
+  if (pIdx === -1) return;
+
+  const product = products[pIdx];
+  const qty = Math.max(0, Number(product.quantity) || 0);
+  const newCodes = [];
+
+  for (let i = 0; i < qty; i++) {
+    const num = startNum + i;
+    newCodes.push(`${prefix}${String(num).padStart(5, '0')}`);
+  }
+
+  products[pIdx].inventoryCodes = newCodes;
+  localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+
+  showToast(`✨ ${qty} etiquetas renumeradas com o prefixo "${prefix}"!`, 'success');
+  window.closeRenumberProductModal();
+  window.filterInvModalList();
+  if (window.renderLabelSheetPreview) window.renderLabelSheetPreview();
 };
 
 window.copyAllInvTagsToClipboard = function() {
