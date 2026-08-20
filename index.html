@@ -1038,6 +1038,12 @@
             <div id="inv-modal-prod-meta" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;">-</div>
           </div>
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-sm btn-secondary" onclick="window.openInvConfigModal()" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; background: rgba(245, 158, 11, 0.1);" title="Alterar o prefixo e padrão numérico de todas as etiquetas">
+              <i data-lucide="settings"></i> Padrão (INV)
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="window.openRenumberProductModal()" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399; background: rgba(16, 185, 129, 0.1);" title="Renumerar / aplicar padrão exclusivo a este produto">
+              <i data-lucide="refresh-cw"></i> Renumerar Item
+            </button>
             <button class="btn btn-sm btn-secondary" onclick="window.copyAllInvTagsToClipboard()">
               <i data-lucide="copy"></i> Copiar Todos
             </button>
@@ -1127,6 +1133,176 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIGURE INV / ASSET TAGS PATTERN (PADRÃO EDITÁVEL DE ETIQUETAS) -->
+  <div class="modal-backdrop" id="inv-config-modal">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; color: #fbbf24;">
+            <i data-lucide="sliders"></i> Padrão de Numeração das Etiquetas
+          </h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+            Personalize o prefixo, formato e sequencial das etiquetas de patrimônio
+          </p>
+        </div>
+        <button class="close-btn" onclick="window.closeInvConfigModal()">&times;</button>
+      </div>
+
+      <form id="inv-config-form" onsubmit="window.handleSaveInvConfig(event)">
+        <div class="modal-body">
+          
+          <!-- Live Preview Card -->
+          <div style="background: rgba(15, 23, 42, 0.7); border: 2px dashed rgba(245, 158, 11, 0.5); border-radius: var(--radius-md); padding: 1rem; text-align: center; margin-bottom: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+              Exemplo do Novo Padrão de Etiqueta
+            </div>
+            <div id="inv-config-live-preview" style="font-family: monospace; font-size: 1.4rem; font-weight: 800; color: #fbbf24; margin: 0.35rem 0; letter-spacing: 1.5px;">
+              INV-000001
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-dark);">
+              Código gerado automaticamente para os ativos e produtos físicos
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="inv-config-prefix">Prefixo do Código *</label>
+              <input type="text" id="inv-config-prefix" class="form-control" placeholder="Ex: INV, PAT, IAT, TI, EQP" value="INV" oninput="window.updateInvConfigPreview()" required>
+              <div style="font-size: 0.725rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Letras ou sigla inicial (ex: <code>PAT</code>, <code>IAT</code>, <code>TI</code>)
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="inv-config-separator">Separador</label>
+              <select id="inv-config-separator" class="form-control" onchange="window.updateInvConfigPreview()">
+                <option value="-" selected>Traço ( - ) -> Ex: INV-000001</option>
+                <option value="/">Barra ( / ) -> Ex: INV/000001</option>
+                <option value=".">Ponto ( . ) -> Ex: INV.000001</option>
+                <option value="_">Underline ( _ ) -> Ex: INV_000001</option>
+                <option value="">Sem separador -> Ex: INV000001</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="inv-config-digits">Quantidade de Dígitos (Zeros à Esquerda)</label>
+              <select id="inv-config-digits" class="form-control" onchange="window.updateInvConfigPreview()">
+                <option value="4">4 dígitos (Ex: 0001)</option>
+                <option value="5">5 dígitos (Ex: 00001)</option>
+                <option value="6" selected>6 dígitos (Ex: 000001 - Padrão)</option>
+                <option value="7">7 dígitos (Ex: 0000001)</option>
+                <option value="8">8 dígitos (Ex: 00000001)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="inv-config-suffix">Sufixo Opcional</label>
+              <input type="text" id="inv-config-suffix" class="form-control" placeholder="Ex: /2026, -BR, .A" oninput="window.updateInvConfigPreview()">
+              <div style="font-size: 0.725rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Texto anexado ao final do código (opcional)
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.5rem; background: rgba(15, 23, 42, 0.4); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; font-size: 0.85rem; color: var(--text-main);">
+              <input type="checkbox" id="inv-config-apply-all-checkbox" style="width: 16px; height: 16px; accent-color: var(--warning);">
+              <span><strong>Atualizar também todos os códigos de estoque existentes</strong> para este novo padrão agora</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeInvConfigModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="background: var(--warning); border-color: var(--warning); color: #000;">
+            <i data-lucide="check"></i> Salvar Novo Padrão
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT SINGLE TAG CODE (EDITAR CÓDIGO INDIVIDUAL DE ETIQUETA) -->
+  <div class="modal-backdrop" id="inv-edit-single-modal">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--primary);">
+            <i data-lucide="edit-3"></i> Editar Código da Etiqueta
+          </h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+            Altere manualmente o código desta unidade física
+          </p>
+        </div>
+        <button class="close-btn" onclick="window.closeEditSingleTagModal()">&times;</button>
+      </div>
+
+      <form id="inv-edit-single-form" onsubmit="window.handleSaveSingleTagCode(event)">
+        <input type="hidden" id="inv-edit-old-code">
+        
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="inv-edit-new-code">Novo Código Personalizado *</label>
+            <input type="text" id="inv-edit-new-code" class="form-control" style="font-family: monospace; font-size: 1.1rem; font-weight: 700;" placeholder="Ex: IAT-NOTE-001 ou INV-998811" required>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+              Você pode digitar qualquer formato alfanumérico desejado.
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeEditSingleTagModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Atualizar Código
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RENUMBER PRODUCT TAGS (RENUMERAR ETIQUETAS DO PRODUTO ATUAL) -->
+  <div class="modal-backdrop" id="inv-renumber-product-modal">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; color: #34d399;">
+            <i data-lucide="refresh-cw"></i> Renumerar Etiquetas Deste Produto
+          </h3>
+          <p id="inv-renumber-prod-subtitle" style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+            Defina um prefixo ou padrão exclusivo para este item
+          </p>
+        </div>
+        <button class="close-btn" onclick="window.closeRenumberProductModal()">&times;</button>
+      </div>
+
+      <form id="inv-renumber-form" onsubmit="window.handleRenumberProductSubmit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="inv-renumber-prefix">Prefixo Exclusivo para Este Produto *</label>
+            <input type="text" id="inv-renumber-prefix" class="form-control" placeholder="Ex: IAT-NOTE-, PAT-SERV-, INV-" required>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+              Exemplo: se digitar <code>IAT-NOTE-</code>, as etiquetas serão <code>IAT-NOTE-000001</code>, <code>IAT-NOTE-000002</code>...
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="inv-renumber-start">Número Inicial</label>
+            <input type="number" id="inv-renumber-start" class="form-control" value="1" min="1" required>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeRenumberProductModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">
+            <i data-lucide="check"></i> Aplicar e Renumerar
+          </button>
+        </div>
+      </form>
     </div>
   </div>
   <!-- MODAL: ADD / EDIT USER -->
