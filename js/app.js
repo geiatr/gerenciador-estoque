@@ -2890,8 +2890,10 @@ window.sendReportViaMailto = function() {
   showToast(`📧 Abrindo leitor de e-mail (Outlook/Gmail) para ${emailTarget}...`, 'success');
 };
 
-/* Inventory Tags (INV) Modal Handlers */
+/* Inventory Tags (INV) Modal & Print Preview Handlers */
 let currentInvModalProductId = null;
+let currentLabelPreviewProductId = null;
+let currentLabelPreviewCols = 3;
 
 window.openInvTagsModal = function(productId) {
   currentInvModalProductId = productId;
@@ -2963,9 +2965,125 @@ window.copyAllInvTagsToClipboard = function() {
   }
 };
 
-window.printInvTagsLabels = function() {
-  if (!currentInvModalProductId) return;
-  const product = getProductById(currentInvModalProductId);
+window.openLabelPrintPreviewModal = function(productId) {
+  const prodId = productId || currentInvModalProductId;
+  if (!prodId) return;
+  currentLabelPreviewProductId = prodId;
+  const product = getProductById(prodId);
+  if (!product) return;
+
+  const countTag = document.getElementById('label-preview-count-tag');
+  const subtitle = document.getElementById('label-preview-subtitle');
+  if (countTag) {
+    const total = (product.inventoryCodes || []).length;
+    countTag.textContent = `${total} ${total === 1 ? 'Etiqueta' : 'Etiquetas'}`;
+  }
+  if (subtitle) {
+    subtitle.textContent = `Produto: ${product.name} (${product.sku}) • Total: ${(product.inventoryCodes || []).length} unidades físicas`;
+  }
+
+  window.renderLabelSheetPreview();
+  const modal = document.getElementById('label-preview-modal');
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeLabelPrintPreviewModal = function() {
+  const modal = document.getElementById('label-preview-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.changeLabelPreviewLayout = function(cols) {
+  currentLabelPreviewCols = cols;
+  [2, 3, 4].forEach(c => {
+    const btn = document.getElementById(`btn-layout-cols-${c}`);
+    if (btn) {
+      if (c === cols) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+  window.renderLabelSheetPreview();
+};
+
+window.renderLabelSheetPreview = function() {
+  if (!currentLabelPreviewProductId) return;
+  const product = getProductById(currentLabelPreviewProductId);
+  const canvas = document.getElementById('label-sheet-preview-canvas');
+  if (!canvas || !product) return;
+
+  const codes = product.inventoryCodes || [];
+  const nowStr = new Date().toLocaleDateString('pt-BR');
+  const logoUrl = './assets/logo.png';
+
+  if (codes.length === 0) {
+    canvas.innerHTML = `
+      <div style="text-align: center; color: #64748b; padding: 3rem;">
+        <h3>Nenhuma etiqueta gerada para este produto</h3>
+        <p>Cadastre ou adicione saldo ao produto para gerar os números de patrimônio INV.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const colsClass = `cols-${currentLabelPreviewCols}`;
+
+  canvas.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 2px solid #0f172a; padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <img src="${logoUrl}" alt="IA TECNOLOGIA" style="height: 38px; object-fit: contain;">
+        <div>
+          <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; line-height: 1.2;">IA TECNOLOGIA • StockMaster</div>
+          <div style="font-size: 0.75rem; color: #475569; margin-top: 2px;">Sistema Integrado de Controle Patrimonial e Rastreabilidade</div>
+        </div>
+      </div>
+      <div style="text-align: right; font-size: 0.8rem; color: #334155;">
+        <div><strong>Folha de Etiquetas de Patrimônio (INV)</strong></div>
+        <div>Produto: <strong>${product.name}</strong> (${product.sku})</div>
+        <div style="font-size: 0.75rem; color: #64748b;">Emitido em: ${nowStr} • Total: ${codes.length} etiquetas</div>
+      </div>
+    </div>
+
+    <div class="preview-label-grid ${colsClass}">
+      ${codes.map((code, idx) => `
+        <div class="preview-label-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 4px;">
+            <img src="${logoUrl}" alt="IA" style="height: 14px; object-fit: contain;">
+            <span style="font-size: 6.5pt; font-weight: 800; letter-spacing: 0.5px; color: #0f172a;">PATRIMÔNIO</span>
+          </div>
+
+          <div style="font-family: monospace; font-size: 11pt; font-weight: 900; color: #0f172a; letter-spacing: 1px; margin: 2px 0;">
+            ${code}
+          </div>
+
+          <div class="preview-barcode-mock">
+            ||||| |||| ||||| || ||| ||||
+          </div>
+
+          <div style="font-size: 7pt; font-weight: 700; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${product.name}
+          </div>
+
+          <div style="font-size: 6.5pt; color: #475569; display: flex; justify-content: space-between; margin-top: 2px;">
+            <span>SKU: ${product.sku}</span>
+            <span>Unid. #${idx + 1} de ${codes.length}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="margin-top: 20px; padding-top: 10px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748b;">
+      <div>StockMaster Enterprise • IA TECNOLOGIA</div>
+      <div>Página 1 de 1 • Papel Adesivo Padrão A4</div>
+    </div>
+  `;
+};
+
+window.printCurrentLabelPreview = function() {
+  if (!currentLabelPreviewProductId) {
+    currentLabelPreviewProductId = currentInvModalProductId;
+  }
+  if (!currentLabelPreviewProductId) return;
+  const product = getProductById(currentLabelPreviewProductId);
   if (!product || !product.inventoryCodes || product.inventoryCodes.length === 0) {
     if (window.showToast) window.showToast('Nenhuma etiqueta disponível para impressão.', 'warning');
     return;
@@ -2976,6 +3094,7 @@ window.printInvTagsLabels = function() {
 
   const nowStr = new Date().toLocaleDateString('pt-BR');
   const logoUrl = './assets/logo.png';
+  const colsClass = `cols-${currentLabelPreviewCols}`;
 
   sheet.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 8px;">
@@ -2985,7 +3104,7 @@ window.printInvTagsLabels = function() {
         <div style="font-size: 8.5pt; color: #333;">Produto: <strong>${product.name}</strong> (${product.sku}) • ${product.inventoryCodes.length} etiquetas • ${nowStr}</div>
       </div>
     </div>
-    <div class="inv-label-grid">
+    <div class="inv-label-grid ${colsClass}">
       ${product.inventoryCodes.map((code, idx) => `
         <div class="inv-label-card">
           <div class="inv-label-header" style="display: flex; align-items: center; justify-content: space-between;">
@@ -2997,7 +3116,7 @@ window.printInvTagsLabels = function() {
             ||||| |||| ||||| || ||| ||||
           </div>
           <div class="inv-label-meta"><strong>${product.name}</strong></div>
-          <div class="inv-label-meta">SKU: ${product.sku} | Unid. #${idx + 1}</div>
+          <div class="inv-label-meta">SKU: ${product.sku} | Unid. #${idx + 1} de ${product.inventoryCodes.length}</div>
         </div>
       `).join('')}
     </div>
@@ -3009,6 +3128,11 @@ window.printInvTagsLabels = function() {
   setTimeout(() => {
     document.body.classList.remove('printing-inv-labels');
   }, 1000);
+};
+
+window.printInvTagsLabels = function() {
+  currentLabelPreviewProductId = currentInvModalProductId;
+  window.printCurrentLabelPreview();
 };
 
 /* --------------------------------------------------------------------------
