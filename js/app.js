@@ -4225,10 +4225,10 @@ window.openClientDetailModal = function(clientId) {
       </div>
     </div>
 
-    <!-- Endereço -->
+    <!-- 1. Endereço -->
     <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
       <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #34d399; display: flex; align-items: center; gap: 0.35rem;">
-        <i data-lucide="map-pin" style="width: 16px; height: 16px;"></i> Endereço Completo
+        <i data-lucide="map-pin" style="width: 16px; height: 16px;"></i> 1. Endereço Completo
       </h4>
       <div style="font-size: 0.9rem; color: var(--text-main); line-height: 1.5;">
         <div><strong>Logradouro:</strong> ${client.logradouro || '-'}, Nº ${client.numero || 'S/N'} ${client.complemento ? `(${client.complemento})` : ''}</div>
@@ -4237,10 +4237,10 @@ window.openClientDetailModal = function(clientId) {
       </div>
     </div>
 
-    <!-- Contato & Responsável -->
+    <!-- 2. Contato & Responsável -->
     <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
       <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #fbbf24; display: flex; align-items: center; gap: 0.35rem;">
-        <i data-lucide="phone" style="width: 16px; height: 16px;"></i> Contato & Responsável Comercial
+        <i data-lucide="phone" style="width: 16px; height: 16px;"></i> 2. Contato & Responsável Comercial
       </h4>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; font-size: 0.875rem;">
         <div><strong>Responsável:</strong> ${client.contatoNome || '-'}</div>
@@ -4249,20 +4249,212 @@ window.openClientDetailModal = function(clientId) {
       </div>
     </div>
 
+    <!-- 3. Contrato de Prestação de Serviços (PDF) -->
+    <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;" id="client-detail-contract-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.35rem;">
+        <h4 style="margin: 0; font-size: 0.9rem; color: #38bdf8; display: flex; align-items: center; gap: 0.35rem;">
+          <i data-lucide="file-text" style="width: 16px; height: 16px;"></i> 3. Contrato de Prestação de Serviços (PDF)
+        </h4>
+        ${client.contractPdf ? `
+          <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;">
+            🟢 Documento PDF Anexado
+          </span>
+        ` : `
+          <span class="badge" style="background: rgba(100, 116, 139, 0.2); color: var(--text-muted); font-size: 0.75rem; padding: 0.15rem 0.5rem;">
+            ⚪ Nenhum Arquivo Anexado
+          </span>
+        `}
+      </div>
+
+      ${client.contractPdf ? `
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-sm); padding: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 42px; height: 42px; border-radius: var(--radius-sm); background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); display: flex; align-items: center; justify-content: center; color: #ef4444; font-size: 1.35rem; flex-shrink: 0;">
+              📄
+            </div>
+            <div>
+              <strong style="color: var(--text-main); font-size: 0.9rem; display: block; word-break: break-all;">${client.contractPdf.name || 'Contrato.pdf'}</strong>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">
+                ${client.contractPdf.size ? (client.contractPdf.size / 1024).toFixed(1) + ' KB • ' : ''}
+                Enviado em ${client.contractPdf.uploadedAt ? new Date(client.contractPdf.uploadedAt).toLocaleDateString('pt-BR') : 'Hoje'}
+              </span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+            <button class="btn btn-sm btn-primary" onclick="window.viewClientContractPdf('${client.id}')" title="Visualizar Contrato PDF" style="font-size: 0.8rem; padding: 0.35rem 0.65rem;">
+              <i data-lucide="eye"></i> Visualizar PDF
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="window.downloadClientContractPdf('${client.id}')" title="Baixar Arquivo PDF" style="font-size: 0.8rem; padding: 0.35rem 0.65rem;">
+              <i data-lucide="download"></i> Baixar
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="window.triggerClientContractUpload()" title="Substituir por outro arquivo PDF" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; color: #fbbf24;">
+              <i data-lucide="refresh-cw"></i> Substituir
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="window.removeClientContractPdf('${client.id}')" title="Remover Contrato" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; color: var(--danger);">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+        </div>
+      ` : `
+        <div style="text-align: center; padding: 1.5rem 1rem; border: 2px dashed rgba(255, 255, 255, 0.15); border-radius: var(--radius-sm); background: rgba(0, 0, 0, 0.15);">
+          <div style="font-size: 2rem; margin-bottom: 0.35rem;">📄</div>
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.25rem;">Nenhum arquivo PDF de contrato anexado</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 1rem 0;">
+            Clique no botão abaixo para anexar o contrato assinado em formato PDF para este cliente.
+          </p>
+          <button class="btn btn-primary" onclick="window.triggerClientContractUpload()" style="font-size: 0.85rem; padding: 0.45rem 1.15rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <i data-lucide="upload"></i> Inserir / Anexar Contrato PDF
+          </button>
+        </div>
+      `}
+    </div>
+
     ${client.observacoes ? `
       <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem;">
-        <h4 style="margin: 0 0 0.35rem 0; font-size: 0.85rem; color: var(--text-muted);">Observações / Notas</h4>
+        <h4 style="margin: 0 0 0.35rem 0; font-size: 0.85rem; color: var(--text-muted);">4. Observações / Notas</h4>
         <div style="font-size: 0.85rem; color: var(--text-main); line-height: 1.4;">${client.observacoes}</div>
       </div>
     ` : ''}
   `;
 
   const editBtn = document.getElementById('btn-detail-edit-client');
-  if (editBtn) editBtn.style.display = isAdmin() ? 'inline-flex' : 'none';
+  if (editBtn) editBtn.style.display = 'inline-flex';
 
   const modal = document.getElementById('client-detail-modal');
   if (modal) modal.classList.add('active');
   setTimeout(initIcons, 50);
+};
+
+/* --- CONTRACT PDF ATTACHMENT ENGINE --- */
+window.triggerClientContractUpload = function() {
+  const fileInput = document.getElementById('client-contract-file-input');
+  if (fileInput) {
+    fileInput.value = '';
+    fileInput.click();
+  }
+};
+
+window.handleClientContractFileSelected = function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!currentDetailClientId) {
+    showToast('Nenhum cliente selecionado para anexar contrato.', 'danger');
+    return;
+  }
+
+  // Verify PDF format
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.pdf') && file.type !== 'application/pdf') {
+    showToast('⚠️ Por favor, selecione um arquivo em formato PDF (.pdf).', 'warning');
+    return;
+  }
+
+  // 12MB limit for LocalStorage persistence safety
+  if (file.size > 12 * 1024 * 1024) {
+    showToast('⚠️ O arquivo PDF selecionado é muito grande (máximo recomendado: 12MB).', 'warning');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64Data = e.target.result;
+    const clients = getClients();
+    const idx = clients.findIndex(c => c.id === currentDetailClientId);
+    if (idx === -1) return;
+
+    clients[idx].contractPdf = {
+      name: file.name,
+      size: file.size,
+      type: file.type || 'application/pdf',
+      data: base64Data,
+      uploadedAt: new Date().toISOString()
+    };
+
+    saveClients(clients);
+    showToast(`📄 Contrato "${file.name}" anexado com sucesso ao cliente!`, 'success');
+    window.openClientDetailModal(currentDetailClientId);
+    window.renderClientsTable();
+  };
+
+  reader.onerror = function() {
+    showToast('Erro ao ler o arquivo PDF. Tente novamente.', 'danger');
+  };
+
+  reader.readAsDataURL(file);
+};
+
+window.viewClientContractPdf = function(clientId) {
+  const targetId = clientId || currentDetailClientId;
+  const client = getClientById(targetId);
+  if (!client || !client.contractPdf || !client.contractPdf.data) {
+    showToast('Nenhum contrato PDF encontrado para este cliente.', 'warning');
+    return;
+  }
+
+  try {
+    const dataUrl = client.contractPdf.data;
+    // Convert base64 Data URL to Blob for native full-page browser rendering
+    fetch(dataUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        const fileUrl = URL.createObjectURL(blob);
+        window.open(fileUrl, '_blank');
+      })
+      .catch(() => {
+        // Fallback popup window with iframe
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Contrato - ${client.razaoSocial}</title></head>
+            <body style="margin:0; padding:0; background:#1e293b; height:100vh; overflow:hidden;">
+              <iframe src="${dataUrl}" style="border:0; width:100%; height:100%;" allowfullscreen></iframe>
+            </body>
+            </html>
+          `);
+        }
+      });
+  } catch (err) {
+    window.open(client.contractPdf.data, '_blank');
+  }
+};
+
+window.downloadClientContractPdf = function(clientId) {
+  const targetId = clientId || currentDetailClientId;
+  const client = getClientById(targetId);
+  if (!client || !client.contractPdf || !client.contractPdf.data) {
+    showToast('Nenhum contrato PDF encontrado para este cliente.', 'warning');
+    return;
+  }
+
+  const a = document.createElement('a');
+  a.href = client.contractPdf.data;
+  a.download = client.contractPdf.name || `Contrato_${client.razaoSocial.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('📥 Download do contrato iniciado!', 'success');
+};
+
+window.removeClientContractPdf = function(clientId) {
+  const targetId = clientId || currentDetailClientId;
+  const client = getClientById(targetId);
+  if (!client) return;
+
+  if (confirm(`Tem certeza que deseja remover o contrato em PDF do cliente "${client.razaoSocial}"?`)) {
+    const clients = getClients();
+    const idx = clients.findIndex(c => c.id === targetId);
+    if (idx !== -1) {
+      delete clients[idx].contractPdf;
+      saveClients(clients);
+      showToast('🗑️ Contrato PDF removido da ficha do cliente.', 'info');
+      window.openClientDetailModal(targetId);
+      window.renderClientsTable();
+    }
+  }
 };
 
 window.closeClientDetailModal = function() {
@@ -4287,6 +4479,10 @@ window.printClientDetailSheet = function() {
   const nowStr = new Date().toLocaleDateString('pt-BR');
   const logoUrl = './assets/logo.png';
 
+  const contractInfo = client.contractPdf 
+    ? `ANEXADO (${client.contractPdf.name} - ${(client.contractPdf.size / 1024).toFixed(1)} KB)`
+    : 'NÃO ANEXADO';
+
   sheet.innerHTML = `
     <div style="padding: 24px; font-family: Arial, sans-serif; color: #000; background: #fff;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px;">
@@ -4302,7 +4498,7 @@ window.printClientDetailSheet = function() {
         <table style="width: 100%; font-size: 9.5pt; line-height: 1.6;">
           <tr><td style="width: 180px;"><strong>Razão Social:</strong></td><td>${client.razaoSocial}</td></tr>
           <tr><td><strong>Nome Fantasia:</strong></td><td>${client.nomeFantasia || '-'}</td></tr>
-          <tr><td><strong>CNPJ:</strong></td><td>${client.cnpj}</td></tr>
+          <tr><td><strong>CNPJ:</strong></td><td>${client.cnpj || '-'}</td></tr>
           <tr><td><strong>Inscrição Estadual (IE):</strong></td><td>${client.inscricaoEstadual || 'ISENTO'}</td></tr>
           <tr><td><strong>Status Cadastral:</strong></td><td>${client.status === 'active' ? 'ATIVO' : 'INATIVO'}</td></tr>
         </table>
@@ -4324,6 +4520,7 @@ window.printClientDetailSheet = function() {
           <tr><td style="width: 180px;"><strong>Nome do Contato:</strong></td><td>${client.contatoNome || '-'}</td></tr>
           <tr><td><strong>Telefone:</strong></td><td>${client.telefone || '-'}</td></tr>
           <tr><td><strong>E-mail:</strong></td><td>${client.email || '-'}</td></tr>
+          <tr><td><strong>Contrato PDF:</strong></td><td>${contractInfo}</td></tr>
           <tr><td><strong>Observações:</strong></td><td>${client.observacoes || '-'}</td></tr>
         </table>
       </div>
