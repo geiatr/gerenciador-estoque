@@ -1135,7 +1135,7 @@ function applyPermissionVisibility() {
   const addClientBtn = document.getElementById('btn-add-client');
   if (quickTransaction) quickTransaction.style.display = admin ? 'inline-flex' : 'none';
   if (quickAddProd) quickAddProd.style.display = admin ? 'inline-flex' : 'none';
-  if (addClientBtn) addClientBtn.style.display = admin ? 'inline-flex' : 'none';
+  if (addClientBtn) addClientBtn.style.display = 'inline-flex';
 
   // 2. Sidebar users tab (only admins see and manage users)
   const usersTab = document.getElementById('nav-btn-users');
@@ -2105,6 +2105,14 @@ function setupEventListeners() {
     supplierForm.addEventListener('submit', (e) => {
       e.preventDefault();
       saveSupplierFromForm();
+    });
+  }
+
+  const clientForm = document.getElementById('client-form');
+  if (clientForm) {
+    clientForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      window.handleClientFormSubmit(e);
     });
   }
 
@@ -3994,14 +4002,12 @@ window.renderClientsTable = function() {
             <button class="btn btn-sm btn-secondary" onclick="window.openClientDetailModal('${c.id}')" title="Ver Ficha Cadastral Completa">
               <i data-lucide="eye"></i>
             </button>
-            ${admin ? `
-              <button class="btn btn-sm btn-secondary" onclick="window.openEditClientModal('${c.id}')" title="Editar Cadastro do Cliente">
-                <i data-lucide="edit"></i>
-              </button>
-              <button class="btn btn-sm btn-secondary" onclick="window.deleteClient('${c.id}')" title="Excluir Cliente" style="color: var(--danger);">
-                <i data-lucide="trash-2"></i>
-              </button>
-            ` : ''}
+            <button class="btn btn-sm btn-secondary" onclick="window.openEditClientModal('${c.id}')" title="Editar Cadastro do Cliente">
+              <i data-lucide="edit"></i>
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="window.deleteClient('${c.id}')" title="Excluir Cliente" style="color: var(--danger);">
+              <i data-lucide="trash-2"></i>
+            </button>
           </div>
         </td>
       </tr>
@@ -4014,10 +4020,6 @@ window.renderClientsTable = function() {
 let currentDetailClientId = null;
 
 window.openAddClientModal = function() {
-  if (!isAdmin()) {
-    showToast('🔒 Permissão negada: Somente administradores podem cadastrar clientes.', 'warning');
-    return;
-  }
   const form = document.getElementById('client-form');
   if (form) form.reset();
 
@@ -4032,32 +4034,33 @@ window.openAddClientModal = function() {
 };
 
 window.openEditClientModal = function(clientId) {
-  if (!isAdmin()) {
-    showToast('🔒 Permissão negada: Somente administradores podem editar clientes.', 'warning');
-    return;
-  }
   const client = getClientById(clientId);
   if (!client) return;
 
-  document.getElementById('client-edit-id').value = client.id;
-  document.getElementById('client-razao-social').value = client.razaoSocial || '';
-  document.getElementById('client-nome-fantasia').value = client.nomeFantasia || '';
-  document.getElementById('client-cnpj').value = client.cnpj || '';
-  document.getElementById('client-ie').value = client.inscricaoEstadual || '';
-  document.getElementById('client-status').value = client.status || 'active';
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val || '';
+  };
 
-  document.getElementById('client-cep').value = client.cep || '';
-  document.getElementById('client-logradouro').value = client.logradouro || '';
-  document.getElementById('client-numero').value = client.numero || '';
-  document.getElementById('client-complemento').value = client.complemento || '';
-  document.getElementById('client-bairro').value = client.bairro || '';
-  document.getElementById('client-cidade').value = client.cidade || '';
-  document.getElementById('client-uf').value = client.uf || 'SP';
+  setVal('client-edit-id', client.id);
+  setVal('client-razao-social', client.razaoSocial);
+  setVal('client-nome-fantasia', client.nomeFantasia);
+  setVal('client-cnpj', client.cnpj);
+  setVal('client-ie', client.inscricaoEstadual);
+  setVal('client-status', client.status || 'active');
 
-  document.getElementById('client-contato-nome').value = client.contatoNome || '';
-  document.getElementById('client-telefone').value = client.telefone || '';
-  document.getElementById('client-email').value = client.email || '';
-  document.getElementById('client-observacoes').value = client.observacoes || '';
+  setVal('client-cep', client.cep);
+  setVal('client-logradouro', client.logradouro);
+  setVal('client-numero', client.numero);
+  setVal('client-complemento', client.complemento);
+  setVal('client-bairro', client.bairro);
+  setVal('client-cidade', client.cidade);
+  setVal('client-uf', client.uf || 'SP');
+
+  setVal('client-contato-nome', client.contatoNome);
+  setVal('client-telefone', client.telefone);
+  setVal('client-email', client.email);
+  setVal('client-observacoes', client.observacoes);
 
   const title = document.getElementById('client-modal-title');
   if (title) title.innerHTML = '<i data-lucide="edit"></i> Editar Dados do Cliente';
@@ -4074,33 +4077,36 @@ window.closeClientModal = function() {
 
 window.handleClientFormSubmit = function(e) {
   if (e) e.preventDefault();
-  if (!isAdmin()) {
-    showToast('🔒 Permissão negada: Somente administradores podem salvar clientes.', 'danger');
-    return;
-  }
 
-  const editId = document.getElementById('client-edit-id')?.value;
-  const razaoSocial = document.getElementById('client-razao-social')?.value.trim();
-  const nomeFantasia = document.getElementById('client-nome-fantasia')?.value.trim();
-  const cnpj = document.getElementById('client-cnpj')?.value.trim();
-  const inscricaoEstadual = document.getElementById('client-ie')?.value.trim();
+  const getVal = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  };
+
+  const editId = getVal('client-edit-id');
+  const razaoSocial = getVal('client-razao-social');
+  const nomeFantasia = getVal('client-nome-fantasia');
+  const cnpj = getVal('client-cnpj');
+  const inscricaoEstadual = getVal('client-ie');
   const status = document.getElementById('client-status')?.value || 'active';
 
-  const cep = document.getElementById('client-cep')?.value.trim();
-  const logradouro = document.getElementById('client-logradouro')?.value.trim();
-  const numero = document.getElementById('client-numero')?.value.trim();
-  const complemento = document.getElementById('client-complemento')?.value.trim();
-  const bairro = document.getElementById('client-bairro')?.value.trim();
-  const cidade = document.getElementById('client-cidade')?.value.trim();
+  const cep = getVal('client-cep');
+  const logradouro = getVal('client-logradouro');
+  const numero = getVal('client-numero');
+  const complemento = getVal('client-complemento');
+  const bairro = getVal('client-bairro');
+  const cidade = getVal('client-cidade');
   const uf = document.getElementById('client-uf')?.value || 'SP';
 
-  const contatoNome = document.getElementById('client-contato-nome')?.value.trim();
-  const telefone = document.getElementById('client-telefone')?.value.trim();
-  const email = document.getElementById('client-email')?.value.trim();
-  const observacoes = document.getElementById('client-observacoes')?.value.trim();
+  const contatoNome = getVal('client-contato-nome');
+  const telefone = getVal('client-telefone');
+  const email = getVal('client-email');
+  const observacoes = getVal('client-observacoes');
 
-  if (!razaoSocial || !cnpj) {
-    showToast('Preencha os campos obrigatórios: Razão Social e CNPJ.', 'warning');
+  if (!razaoSocial) {
+    showToast('Informe a Razão Social do cliente para continuar.', 'warning');
+    const razaoInput = document.getElementById('client-razao-social');
+    if (razaoInput) razaoInput.focus();
     return;
   }
 
@@ -4162,10 +4168,6 @@ window.handleClientFormSubmit = function(e) {
 };
 
 window.deleteClient = function(clientId) {
-  if (!isAdmin()) {
-    showToast('🔒 Permissão negada: Somente administradores podem excluir clientes.', 'danger');
-    return;
-  }
   const client = getClientById(clientId);
   if (!client) return;
 
