@@ -325,6 +325,49 @@ const INITIAL_TRANSACTIONS = [
   }
 ];
 
+const INITIAL_CLIENTS = [
+  {
+    id: 'cli-1',
+    razaoSocial: 'TechCorp Inovações Digitais Ltda',
+    nomeFantasia: 'TechCorp Brasil',
+    cnpj: '12.345.678/0001-90',
+    inscricaoEstadual: '123.456.789.000',
+    cep: '01310-100',
+    logradouro: 'Av. Paulista',
+    numero: '1000',
+    complemento: 'Conjunto 1402',
+    bairro: 'Bela Vista',
+    cidade: 'São Paulo',
+    uf: 'SP',
+    contatoNome: 'Roberto Mendes',
+    telefone: '(11) 98765-4321',
+    email: 'compras@techcorp.com.br',
+    observacoes: 'Cliente corporativo prioritário. Entregas em horário comercial.',
+    status: 'active',
+    createdAt: new Date(Date.now() - 86400000 * 30).toISOString()
+  },
+  {
+    id: 'cli-2',
+    razaoSocial: 'MegaLog Soluções em Logística e Transportes S/A',
+    nomeFantasia: 'MegaLogística',
+    cnpj: '98.765.432/0001-10',
+    inscricaoEstadual: '987.654.321.111',
+    cep: '20040-002',
+    logradouro: 'Rua Primeiro de Março',
+    numero: '250',
+    complemento: 'Sala 801',
+    bairro: 'Centro',
+    cidade: 'Rio de Janeiro',
+    uf: 'RJ',
+    contatoNome: 'Juliana Ferreira',
+    telefone: '(21) 99887-1122',
+    email: 'suprimentos@megalog.com.br',
+    observacoes: 'Faturamento quinzenal com NF eletrônica.',
+    status: 'active',
+    createdAt: new Date(Date.now() - 86400000 * 15).toISOString()
+  }
+];
+
 /* --------------------------------------------------------------------------
    2. STORAGE ENGINE (LocalStorage)
    -------------------------------------------------------------------------- */
@@ -336,7 +379,8 @@ const STORAGE_KEYS = {
   USERS: 'stockmaster_users_v1',
   CURRENT_USER: 'stockmaster_current_user_v1',
   ONLINE_SESSIONS: 'stockmaster_online_sessions_v2',
-  INV_CONFIG: 'stockmaster_inv_config_v1'
+  INV_CONFIG: 'stockmaster_inv_config_v1',
+  CLIENTS: 'stockmaster_clients_v1'
 };
 
 function getInvConfig() {
@@ -427,6 +471,9 @@ function initStorage() {
   if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(INITIAL_TRANSACTIONS));
   }
+  if (!localStorage.getItem(STORAGE_KEYS.CLIENTS)) {
+    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(INITIAL_CLIENTS));
+  }
 }
 
 function resetStorage() {
@@ -434,6 +481,25 @@ function resetStorage() {
   localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(INITIAL_CATEGORIES));
   localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(INITIAL_SUPPLIERS));
   localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(INITIAL_TRANSACTIONS));
+  localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(INITIAL_CLIENTS));
+}
+
+function getClients() {
+  initStorage();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CLIENTS);
+    return raw ? JSON.parse(raw) : INITIAL_CLIENTS;
+  } catch (e) {
+    return INITIAL_CLIENTS;
+  }
+}
+
+function saveClients(clients) {
+  localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
+}
+
+function getClientById(id) {
+  return getClients().find(c => c.id === id);
 }
 
 function getProducts() {
@@ -885,6 +951,7 @@ function updateOnlineHeartbeat() {
     inventory: '📦 Catálogo de Inventário',
     transactions: '🔄 Histórico de Movimentações',
     categories: '📁 Categorias & Fornecedores',
+    clients: '🏢 Gestão de Clientes',
     reports: '📈 Relatórios Gerenciais',
     users: '👥 Gestão de Usuários'
   };
@@ -1065,8 +1132,10 @@ function applyPermissionVisibility() {
   // 1. Header quick actions
   const quickTransaction = document.getElementById('btn-quick-transaction');
   const quickAddProd = document.getElementById('btn-quick-add-product');
+  const addClientBtn = document.getElementById('btn-add-client');
   if (quickTransaction) quickTransaction.style.display = admin ? 'inline-flex' : 'none';
   if (quickAddProd) quickAddProd.style.display = admin ? 'inline-flex' : 'none';
+  if (addClientBtn) addClientBtn.style.display = admin ? 'inline-flex' : 'none';
 
   // 2. Sidebar users tab (only admins see and manage users)
   const usersTab = document.getElementById('nav-btn-users');
@@ -1371,6 +1440,8 @@ function renderApp() {
     renderTransactionsTable();
   } else if (state.currentTab === 'categories') {
     renderCategoriesView();
+  } else if (state.currentTab === 'clients') {
+    renderClientsView();
   } else if (state.currentTab === 'reports') {
     renderReportsView();
   } else if (state.currentTab === 'users') {
@@ -3793,4 +3864,561 @@ window.handleSelfProfileSubmit = function(e) {
   saveUsers(users);
   showToast('🔑 Sua senha foi alterada com sucesso!', 'success');
   window.closeSelfProfileModal();
+};
+
+/* --------------------------------------------------------------------------
+   7. CLIENTS MANAGEMENT (CADASTRO & GESTÃO DE CLIENTES)
+   -------------------------------------------------------------------------- */
+function renderClientsView() {
+  const clients = getClients();
+  
+  // Update stats
+  const totalEl = document.getElementById('stat-total-clients');
+  const activeEl = document.getElementById('stat-active-clients');
+  const ufEl = document.getElementById('stat-uf-clients');
+  const contactsEl = document.getElementById('stat-contacts-clients');
+
+  const activeCount = clients.filter(c => c.status === 'active').length;
+  const uniqueUfs = new Set(clients.map(c => (c.uf || '').toUpperCase()).filter(Boolean));
+  const contactsCount = clients.filter(c => c.email && c.email.trim().length > 0).length;
+
+  if (totalEl) totalEl.textContent = clients.length;
+  if (activeEl) activeEl.textContent = activeCount;
+  if (ufEl) ufEl.textContent = uniqueUfs.size;
+  if (contactsEl) contactsEl.textContent = contactsCount;
+
+  // Populate UF filter dropdown
+  const ufSelect = document.getElementById('clients-uf-filter');
+  if (ufSelect) {
+    const currentVal = ufSelect.value || 'all';
+    const sortedUfs = Array.from(uniqueUfs).sort();
+    ufSelect.innerHTML = `<option value="all">Todos os Estados (${sortedUfs.length})</option>` + 
+      sortedUfs.map(uf => `<option value="${uf}" ${uf === currentVal ? 'selected' : ''}>Estado: ${uf}</option>`).join('');
+  }
+
+  window.renderClientsTable();
+}
+
+window.renderClientsTable = function() {
+  const clients = getClients();
+  const searchInput = document.getElementById('clients-search-input');
+  const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const ufFilter = document.getElementById('clients-uf-filter')?.value || 'all';
+  const tbody = document.getElementById('clients-tbody');
+  if (!tbody) return;
+
+  const admin = isAdmin();
+
+  let filtered = clients;
+
+  if (ufFilter !== 'all') {
+    filtered = filtered.filter(c => (c.uf || '').toUpperCase() === ufFilter.toUpperCase());
+  }
+
+  if (q) {
+    filtered = filtered.filter(c => 
+      (c.razaoSocial || '').toLowerCase().includes(q) ||
+      (c.nomeFantasia || '').toLowerCase().includes(q) ||
+      (c.cnpj || '').toLowerCase().includes(q) ||
+      (c.cidade || '').toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.contatoNome || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">Nenhum cliente encontrado com os filtros selecionados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(c => {
+    const isAct = c.status === 'active';
+    const statusHtml = isAct
+      ? '<span class="badge badge-success" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"><span class="badge-dot-sm"></span> Ativo</span>'
+      : '<span class="badge badge-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"><span class="badge-dot-sm"></span> Inativo</span>';
+
+    const fullAddress = [
+      c.logradouro ? `${c.logradouro}, ${c.numero || 'S/N'}` : '',
+      c.complemento || '',
+      c.bairro || '',
+      c.cidade && c.uf ? `${c.cidade} - ${c.uf}` : (c.cidade || c.uf || ''),
+      c.cep ? `CEP ${c.cep}` : ''
+    ].filter(Boolean).join(' • ');
+
+    const phoneClean = (c.telefone || '').replace(/\D/g, '');
+    const whatsAppUrl = phoneClean.length >= 10 ? `https://wa.me/55${phoneClean}` : null;
+
+    return `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <div class="avatar" style="width: 38px; height: 38px; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border); color: #38bdf8; font-weight: 700; flex-shrink: 0;">
+              ${(c.nomeFantasia || c.razaoSocial || 'CL').slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <strong style="color: var(--text-main); font-size: 0.925rem; display: block;">${c.razaoSocial}</strong>
+              ${c.nomeFantasia ? `<span style="font-size: 0.775rem; color: var(--text-muted); display: block;">🏷️ ${c.nomeFantasia}</span>` : ''}
+            </div>
+          </div>
+        </td>
+        <td>
+          <div style="font-family: monospace; font-size: 0.85rem; font-weight: 600; color: var(--text-main);">
+            ${c.cnpj || '-'}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+            IE: <code>${c.inscricaoEstadual || 'ISENTO'}</code>
+          </div>
+        </td>
+        <td style="font-size: 0.825rem; color: var(--text-muted); max-width: 260px;">
+          <div style="color: var(--text-main); font-weight: 500;">
+            ${c.cidade ? `${c.cidade} / ${c.uf || ''}` : '-'}
+          </div>
+          <div style="font-size: 0.75rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${fullAddress}">
+            ${c.logradouro ? `${c.logradouro}, ${c.numero || ''} - ${c.bairro || ''}` : '-'}
+          </div>
+        </td>
+        <td style="font-size: 0.825rem;">
+          ${c.contatoNome ? `<div style="font-weight: 600; color: var(--text-main); font-size: 0.85rem;">👤 ${c.contatoNome}</div>` : ''}
+          ${c.telefone ? `
+            <div style="margin-top: 0.15rem;">
+              <a href="tel:${phoneClean}" style="color: #34d399; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                📞 ${c.telefone}
+              </a>
+              ${whatsAppUrl ? `<a href="${whatsAppUrl}" target="_blank" title="Abrir WhatsApp" style="margin-left: 0.35rem; color: #22c55e;">💬</a>` : ''}
+            </div>` : ''}
+          ${c.email ? `<div style="margin-top: 0.15rem;"><a href="mailto:${c.email}" style="color: #38bdf8; text-decoration: none; font-size: 0.75rem;">✉️ ${c.email}</a></div>` : ''}
+        </td>
+        <td>${statusHtml}</td>
+        <td style="text-align: right;">
+          <div style="display: inline-flex; gap: 0.35rem;">
+            <button class="btn btn-sm btn-secondary" onclick="window.openClientDetailModal('${c.id}')" title="Ver Ficha Cadastral Completa">
+              <i data-lucide="eye"></i>
+            </button>
+            ${admin ? `
+              <button class="btn btn-sm btn-secondary" onclick="window.openEditClientModal('${c.id}')" title="Editar Cadastro do Cliente">
+                <i data-lucide="edit"></i>
+              </button>
+              <button class="btn btn-sm btn-secondary" onclick="window.deleteClient('${c.id}')" title="Excluir Cliente" style="color: var(--danger);">
+                <i data-lucide="trash-2"></i>
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  setTimeout(initIcons, 50);
+};
+
+let currentDetailClientId = null;
+
+window.openAddClientModal = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem cadastrar clientes.', 'warning');
+    return;
+  }
+  const form = document.getElementById('client-form');
+  if (form) form.reset();
+
+  const editId = document.getElementById('client-edit-id');
+  const title = document.getElementById('client-modal-title');
+  if (editId) editId.value = '';
+  if (title) title.innerHTML = '<i data-lucide="building-2"></i> Novo Cadastro de Cliente';
+
+  const modal = document.getElementById('client-modal');
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.openEditClientModal = function(clientId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem editar clientes.', 'warning');
+    return;
+  }
+  const client = getClientById(clientId);
+  if (!client) return;
+
+  document.getElementById('client-edit-id').value = client.id;
+  document.getElementById('client-razao-social').value = client.razaoSocial || '';
+  document.getElementById('client-nome-fantasia').value = client.nomeFantasia || '';
+  document.getElementById('client-cnpj').value = client.cnpj || '';
+  document.getElementById('client-ie').value = client.inscricaoEstadual || '';
+  document.getElementById('client-status').value = client.status || 'active';
+
+  document.getElementById('client-cep').value = client.cep || '';
+  document.getElementById('client-logradouro').value = client.logradouro || '';
+  document.getElementById('client-numero').value = client.numero || '';
+  document.getElementById('client-complemento').value = client.complemento || '';
+  document.getElementById('client-bairro').value = client.bairro || '';
+  document.getElementById('client-cidade').value = client.cidade || '';
+  document.getElementById('client-uf').value = client.uf || 'SP';
+
+  document.getElementById('client-contato-nome').value = client.contatoNome || '';
+  document.getElementById('client-telefone').value = client.telefone || '';
+  document.getElementById('client-email').value = client.email || '';
+  document.getElementById('client-observacoes').value = client.observacoes || '';
+
+  const title = document.getElementById('client-modal-title');
+  if (title) title.innerHTML = '<i data-lucide="edit"></i> Editar Dados do Cliente';
+
+  const modal = document.getElementById('client-modal');
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeClientModal = function() {
+  const modal = document.getElementById('client-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.handleClientFormSubmit = function(e) {
+  if (e) e.preventDefault();
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem salvar clientes.', 'danger');
+    return;
+  }
+
+  const editId = document.getElementById('client-edit-id')?.value;
+  const razaoSocial = document.getElementById('client-razao-social')?.value.trim();
+  const nomeFantasia = document.getElementById('client-nome-fantasia')?.value.trim();
+  const cnpj = document.getElementById('client-cnpj')?.value.trim();
+  const inscricaoEstadual = document.getElementById('client-ie')?.value.trim();
+  const status = document.getElementById('client-status')?.value || 'active';
+
+  const cep = document.getElementById('client-cep')?.value.trim();
+  const logradouro = document.getElementById('client-logradouro')?.value.trim();
+  const numero = document.getElementById('client-numero')?.value.trim();
+  const complemento = document.getElementById('client-complemento')?.value.trim();
+  const bairro = document.getElementById('client-bairro')?.value.trim();
+  const cidade = document.getElementById('client-cidade')?.value.trim();
+  const uf = document.getElementById('client-uf')?.value || 'SP';
+
+  const contatoNome = document.getElementById('client-contato-nome')?.value.trim();
+  const telefone = document.getElementById('client-telefone')?.value.trim();
+  const email = document.getElementById('client-email')?.value.trim();
+  const observacoes = document.getElementById('client-observacoes')?.value.trim();
+
+  if (!razaoSocial || !cnpj) {
+    showToast('Preencha os campos obrigatórios: Razão Social e CNPJ.', 'warning');
+    return;
+  }
+
+  const clients = getClients();
+
+  if (editId) {
+    const idx = clients.findIndex(c => c.id === editId);
+    if (idx !== -1) {
+      clients[idx] = {
+        ...clients[idx],
+        razaoSocial,
+        nomeFantasia,
+        cnpj,
+        inscricaoEstadual,
+        status,
+        cep,
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        cidade,
+        uf,
+        contatoNome,
+        telefone,
+        email,
+        observacoes,
+        updatedAt: new Date().toISOString()
+      };
+      showToast(`🏢 Cadastro de "${razaoSocial}" atualizado com sucesso!`, 'success');
+    }
+  } else {
+    const newClient = {
+      id: 'cli-' + Date.now(),
+      razaoSocial,
+      nomeFantasia,
+      cnpj,
+      inscricaoEstadual,
+      status,
+      cep,
+      logradouro,
+      numero,
+      complemento,
+      bairro,
+      cidade,
+      uf,
+      contatoNome,
+      telefone,
+      email,
+      observacoes,
+      createdAt: new Date().toISOString()
+    };
+    clients.unshift(newClient);
+    showToast(`🏢 Cliente "${razaoSocial}" cadastrado com sucesso!`, 'success');
+  }
+
+  saveClients(clients);
+  window.closeClientModal();
+  renderClientsView();
+};
+
+window.deleteClient = function(clientId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem excluir clientes.', 'danger');
+    return;
+  }
+  const client = getClientById(clientId);
+  if (!client) return;
+
+  if (confirm(`Tem certeza que deseja excluir o cadastro do cliente "${client.razaoSocial}"? Esta ação não pode ser desfeita.`)) {
+    const clients = getClients().filter(c => c.id !== clientId);
+    saveClients(clients);
+    showToast(`🗑️ Cliente "${client.razaoSocial}" excluído.`, 'info');
+    renderClientsView();
+  }
+};
+
+window.openClientDetailModal = function(clientId) {
+  currentDetailClientId = clientId;
+  const client = getClientById(clientId);
+  if (!client) return;
+
+  const container = document.getElementById('client-detail-body');
+  if (!container) return;
+
+  const fullAddress = [
+    client.logradouro ? `${client.logradouro}, ${client.numero || 'S/N'}` : '',
+    client.complemento ? `(${client.complemento})` : '',
+    client.bairro ? `Bairro: ${client.bairro}` : '',
+    client.cidade && client.uf ? `${client.cidade} - ${client.uf}` : '',
+    client.cep ? `CEP: ${client.cep}` : ''
+  ].filter(Boolean).join(' • ');
+
+  const createdDate = client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-';
+
+  container.innerHTML = `
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <div>
+          <h2 style="margin: 0; font-size: 1.25rem; color: #38bdf8;">${client.razaoSocial}</h2>
+          ${client.nomeFantasia ? `<div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.2rem;">Nome Fantasia: <strong>${client.nomeFantasia}</strong></div>` : ''}
+        </div>
+        <span class="badge ${client.status === 'active' ? 'badge-success' : 'badge-danger'}" style="padding: 0.3rem 0.65rem; font-size: 0.8rem;">
+          ${client.status === 'active' ? '🟢 Cadastro Ativo' : '🔴 Inativo'}
+        </span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; background: rgba(0,0,0,0.2); padding: 0.85rem; border-radius: var(--radius-sm); margin-top: 0.75rem;">
+        <div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">CNPJ</span>
+          <strong style="font-family: monospace; font-size: 0.95rem; color: var(--text-main);">${client.cnpj || '-'}</strong>
+        </div>
+        <div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Inscrição Estadual (IE)</span>
+          <strong style="font-family: monospace; font-size: 0.95rem; color: var(--text-main);">${client.inscricaoEstadual || 'ISENTO'}</strong>
+        </div>
+        <div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Data de Cadastro</span>
+          <span style="font-size: 0.9rem; color: var(--text-main);">${createdDate}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Endereço -->
+    <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+      <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #34d399; display: flex; align-items: center; gap: 0.35rem;">
+        <i data-lucide="map-pin" style="width: 16px; height: 16px;"></i> Endereço Completo
+      </h4>
+      <div style="font-size: 0.9rem; color: var(--text-main); line-height: 1.5;">
+        <div><strong>Logradouro:</strong> ${client.logradouro || '-'}, Nº ${client.numero || 'S/N'} ${client.complemento ? `(${client.complemento})` : ''}</div>
+        <div><strong>Bairro:</strong> ${client.bairro || '-'} • <strong>CEP:</strong> ${client.cep || '-'}</div>
+        <div><strong>Município:</strong> ${client.cidade || '-'} / ${client.uf || '-'}</div>
+      </div>
+    </div>
+
+    <!-- Contato & Responsável -->
+    <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+      <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #fbbf24; display: flex; align-items: center; gap: 0.35rem;">
+        <i data-lucide="phone" style="width: 16px; height: 16px;"></i> Contato & Responsável Comercial
+      </h4>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; font-size: 0.875rem;">
+        <div><strong>Responsável:</strong> ${client.contatoNome || '-'}</div>
+        <div><strong>Telefone:</strong> ${client.telefone || '-'}</div>
+        <div><strong>E-mail:</strong> ${client.email ? `<a href="mailto:${client.email}" style="color:#38bdf8;">${client.email}</a>` : '-'}</div>
+      </div>
+    </div>
+
+    ${client.observacoes ? `
+      <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem;">
+        <h4 style="margin: 0 0 0.35rem 0; font-size: 0.85rem; color: var(--text-muted);">Observações / Notas</h4>
+        <div style="font-size: 0.85rem; color: var(--text-main); line-height: 1.4;">${client.observacoes}</div>
+      </div>
+    ` : ''}
+  `;
+
+  const editBtn = document.getElementById('btn-detail-edit-client');
+  if (editBtn) editBtn.style.display = isAdmin() ? 'inline-flex' : 'none';
+
+  const modal = document.getElementById('client-detail-modal');
+  if (modal) modal.classList.add('active');
+  setTimeout(initIcons, 50);
+};
+
+window.closeClientDetailModal = function() {
+  const modal = document.getElementById('client-detail-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.editCurrentDetailClient = function() {
+  if (currentDetailClientId) {
+    window.closeClientDetailModal();
+    window.openEditClientModal(currentDetailClientId);
+  }
+};
+
+window.printClientDetailSheet = function() {
+  const client = getClientById(currentDetailClientId);
+  if (!client) return;
+
+  const sheet = document.getElementById('printable-inv-sheet');
+  if (!sheet) return;
+
+  const nowStr = new Date().toLocaleDateString('pt-BR');
+  const logoUrl = './assets/logo.png';
+
+  sheet.innerHTML = `
+    <div style="padding: 24px; font-family: Arial, sans-serif; color: #000; background: #fff;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px;">
+        <img src="${logoUrl}" alt="IA TECNOLOGIA" style="height: 42px; object-fit: contain;">
+        <div style="text-align: right;">
+          <h2 style="margin: 0; font-size: 14pt;">FICHA CADASTRAL DE CLIENTE</h2>
+          <div style="font-size: 9pt; color: #555;">IA TECNOLOGIA • Emissão: ${nowStr}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 11pt; border-bottom: 1px solid #ccc; padding-bottom: 4px;">1. DADOS DA EMPRESA</h3>
+        <table style="width: 100%; font-size: 9.5pt; line-height: 1.6;">
+          <tr><td style="width: 180px;"><strong>Razão Social:</strong></td><td>${client.razaoSocial}</td></tr>
+          <tr><td><strong>Nome Fantasia:</strong></td><td>${client.nomeFantasia || '-'}</td></tr>
+          <tr><td><strong>CNPJ:</strong></td><td>${client.cnpj}</td></tr>
+          <tr><td><strong>Inscrição Estadual (IE):</strong></td><td>${client.inscricaoEstadual || 'ISENTO'}</td></tr>
+          <tr><td><strong>Status Cadastral:</strong></td><td>${client.status === 'active' ? 'ATIVO' : 'INATIVO'}</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 11pt; border-bottom: 1px solid #ccc; padding-bottom: 4px;">2. ENDEREÇO COMPLETO</h3>
+        <table style="width: 100%; font-size: 9.5pt; line-height: 1.6;">
+          <tr><td style="width: 180px;"><strong>Logradouro:</strong></td><td>${client.logradouro || '-'}, Nº ${client.numero || 'S/N'} ${client.complemento ? `(${client.complemento})` : ''}</td></tr>
+          <tr><td><strong>Bairro:</strong></td><td>${client.bairro || '-'}</td></tr>
+          <tr><td><strong>Cidade / UF:</strong></td><td>${client.cidade || '-'} / ${client.uf || '-'}</td></tr>
+          <tr><td><strong>CEP:</strong></td><td>${client.cep || '-'}</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 11pt; border-bottom: 1px solid #ccc; padding-bottom: 4px;">3. CONTATO & COMUNICAÇÃO</h3>
+        <table style="width: 100%; font-size: 9.5pt; line-height: 1.6;">
+          <tr><td style="width: 180px;"><strong>Nome do Contato:</strong></td><td>${client.contatoNome || '-'}</td></tr>
+          <tr><td><strong>Telefone:</strong></td><td>${client.telefone || '-'}</td></tr>
+          <tr><td><strong>E-mail:</strong></td><td>${client.email || '-'}</td></tr>
+          <tr><td><strong>Observações:</strong></td><td>${client.observacoes || '-'}</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-top: 30px; border-top: 1px dashed #999; padding-top: 10px; font-size: 8pt; color: #666; text-align: center;">
+        StockMaster Enterprise • IA TECNOLOGIA - Documento para uso interno e cadastral
+      </div>
+    </div>
+  `;
+
+  document.body.classList.add('printing-inv-labels');
+  window.print();
+  setTimeout(() => document.body.classList.remove('printing-inv-labels'), 1000);
+};
+
+window.exportClientsExcel = function() {
+  const clients = getClients();
+  if (clients.length === 0) {
+    showToast('Não há clientes para exportar.', 'warning');
+    return;
+  }
+
+  const fileName = `clientes_stockmaster_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+  if (typeof XLSX !== 'undefined') {
+    try {
+      const data = clients.map(c => ({
+        'Razão Social': c.razaoSocial || '',
+        'Nome Fantasia': c.nomeFantasia || '',
+        'CNPJ': c.cnpj || '',
+        'Inscrição Estadual': c.inscricaoEstadual || '',
+        'Status': c.status === 'active' ? 'Ativo' : 'Inativo',
+        'CEP': c.cep || '',
+        'Logradouro': c.logradouro || '',
+        'Número': c.numero || '',
+        'Complemento': c.complemento || '',
+        'Bairro': c.bairro || '',
+        'Cidade': c.cidade || '',
+        'UF': c.uf || '',
+        'Contato': c.contatoNome || '',
+        'Telefone': c.telefone || '',
+        'E-mail': c.email || '',
+        'Observações': c.observacoes || ''
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+      XLSX.writeFile(wb, fileName);
+      showToast('📊 Lista de clientes exportada com sucesso!', 'success');
+      return;
+    } catch (e) {
+      console.warn('Erro ao exportar via SheetJS:', e);
+    }
+  }
+
+  // CSV Fallback
+  let csv = '\uFEFFRazao Social;Nome Fantasia;CNPJ;IE;Status;CEP;Logradouro;Numero;Complemento;Bairro;Cidade;UF;Contato;Telefone;Email\n';
+  clients.forEach(c => {
+    csv += `"${c.razaoSocial || ''}";"${c.nomeFantasia || ''}";"${c.cnpj || ''}";"${c.inscricaoEstadual || ''}";"${c.status || ''}";"${c.cep || ''}";"${c.logradouro || ''}";"${c.numero || ''}";"${c.complemento || ''}";"${c.bairro || ''}";"${c.cidade || ''}";"${c.uf || ''}";"${c.contatoNome || ''}";"${c.telefone || ''}";"${c.email || ''}"\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `clientes_stockmaster_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  showToast('📊 Planilha CSV de clientes exportada com sucesso!', 'success');
+};
+
+/* Input Masks Helpers */
+window.maskCNPJ = function(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (v.length > 14) v = v.slice(0, 14);
+  v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+  v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+  v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+  v = v.replace(/(\d{4})(\d)/, '$1-$2');
+  input.value = v;
+};
+
+window.maskCEP = function(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (v.length > 8) v = v.slice(0, 8);
+  v = v.replace(/^(\d{5})(\d)/, '$1-$2');
+  input.value = v;
+};
+
+window.maskPhone = function(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (v.length > 11) v = v.slice(0, 11);
+  if (v.length > 10) {
+    v = v.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+  } else if (v.length > 5) {
+    v = v.replace(/^(\d{2})(\d{4})(\d{0,4})$/, '($1) $2-$3');
+  } else if (v.length > 2) {
+    v = v.replace(/^(\d{2})(\d{0,5})$/, '($1) $2');
+  }
+  input.value = v;
 };
