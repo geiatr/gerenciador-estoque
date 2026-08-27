@@ -1780,9 +1780,12 @@
         <!-- Injected via JavaScript -->
       </div>
 
-      <div class="modal-footer" style="justify-content: space-between;">
+      <div class="modal-footer" style="justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
         <button type="button" class="btn btn-secondary" onclick="window.closeClientDetailModal()">Fechar</button>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn btn-secondary" onclick="window.triggerClientContractUpload()" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" title="Inserir ou gerenciar contrato em PDF deste cliente">
+            <i data-lucide="file-text"></i> Contrato
+          </button>
           <button type="button" class="btn btn-secondary" id="btn-detail-edit-client" onclick="window.editCurrentDetailClient()">
             <i data-lucide="edit"></i> Editar Dados
           </button>
@@ -1793,6 +1796,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Hidden Contract File Input -->
+  <input type="file" id="client-contract-file-input" accept="application/pdf" style="display: none;" onchange="window.handleClientContractFileSelected(event)">
 
   <!-- PRINTABLE INV LABELS CONTAINER SHEET -->
   <div id="printable-inv-sheet" class="printable-inv-sheet"></div>
