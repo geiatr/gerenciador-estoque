@@ -1143,6 +1143,21 @@ window.renderOnlineUsersList = function() {
   setTimeout(initIcons, 50);
 };
 
+window.toggleMobileSidebar = function(force) {
+  const sidebar = document.getElementById('main-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (!sidebar) return;
+
+  const shouldOpen = force !== undefined ? force : !sidebar.classList.contains('mobile-open');
+  if (shouldOpen) {
+    sidebar.classList.add('mobile-open');
+    if (backdrop) backdrop.classList.add('active');
+  } else {
+    sidebar.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('active');
+  }
+};
+
 function isAdmin() {
   const user = getCurrentUser();
   return user && (user.role === 'admin' || user.username === 'admin');
@@ -1157,7 +1172,7 @@ function applyPermissionVisibility() {
   const addClientBtn = document.getElementById('btn-add-client');
   if (quickTransaction) quickTransaction.style.display = admin ? 'inline-flex' : 'none';
   if (quickAddProd) quickAddProd.style.display = admin ? 'inline-flex' : 'none';
-  if (addClientBtn) addClientBtn.style.display = 'inline-flex';
+  if (addClientBtn) addClientBtn.style.display = admin ? 'inline-flex' : 'none';
 
   // 2. Sidebar users tab (only admins see and manage users)
   const usersTab = document.getElementById('nav-btn-users');
@@ -1165,7 +1180,7 @@ function applyPermissionVisibility() {
     usersTab.parentElement.style.display = admin ? 'block' : 'none';
   }
 
-  // 3. Admin-only buttons
+  // 3. Admin-only buttons across entire application
   document.querySelectorAll('.admin-only').forEach(el => {
     el.style.display = admin ? '' : 'none';
   });
@@ -1445,6 +1460,7 @@ function setupNavigation() {
       }
 
       state.currentTab = tabTarget;
+      window.toggleMobileSidebar(false);
       renderApp();
     });
   });
@@ -1993,9 +2009,13 @@ function renderCategoriesView() {
           <td>${s.email || '-'}</td>
           <td>${s.phone || '-'}</td>
           <td>
-            <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteSupplier('${s.id}')" title="Excluir Fornecedor" style="color: var(--danger);">
-              <i data-lucide="trash-2"></i> Excluir
-            </button>
+            ${isAdmin() ? `
+              <button class="btn btn-sm btn-secondary" onclick="window.confirmDeleteSupplier('${s.id}')" title="Excluir Fornecedor" style="color: var(--danger);">
+                <i data-lucide="trash-2"></i> Excluir
+              </button>
+            ` : `
+              <span style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="lock" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Consulta</span>
+            `}
           </td>
         </tr>
       `).join('');
@@ -4049,12 +4069,14 @@ window.renderClientsTable = function() {
             <button class="btn btn-sm btn-secondary" onclick="window.openClientDetailModal('${c.id}')" title="Ver Ficha Cadastral Completa">
               <i data-lucide="eye"></i>
             </button>
-            <button class="btn btn-sm btn-secondary" onclick="window.openEditClientModal('${c.id}')" title="Editar Cadastro do Cliente">
-              <i data-lucide="edit"></i>
-            </button>
-            <button class="btn btn-sm btn-secondary" onclick="window.deleteClient('${c.id}')" title="Excluir Cliente" style="color: var(--danger);">
-              <i data-lucide="trash-2"></i>
-            </button>
+            ${isAdmin() ? `
+              <button class="btn btn-sm btn-secondary" onclick="window.openEditClientModal('${c.id}')" title="Editar Cadastro do Cliente">
+                <i data-lucide="edit"></i>
+              </button>
+              <button class="btn btn-sm btn-secondary" onclick="window.deleteClient('${c.id}')" title="Excluir Cliente" style="color: var(--danger);">
+                <i data-lucide="trash-2"></i>
+              </button>
+            ` : ''}
           </div>
         </td>
       </tr>
@@ -4067,6 +4089,10 @@ window.renderClientsTable = function() {
 let currentDetailClientId = null;
 
 window.openAddClientModal = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem cadastrar clientes.', 'danger');
+    return;
+  }
   const form = document.getElementById('client-form');
   if (form) form.reset();
 
@@ -4081,6 +4107,10 @@ window.openAddClientModal = function() {
 };
 
 window.openEditClientModal = function(clientId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Usuários em modo consulta não podem editar clientes.', 'danger');
+    return;
+  }
   const client = getClientById(clientId);
   if (!client) return;
 
@@ -4124,6 +4154,10 @@ window.closeClientModal = function() {
 
 window.handleClientFormSubmit = function(e) {
   if (e) e.preventDefault();
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem salvar alterações de clientes.', 'danger');
+    return;
+  }
 
   const getVal = (id) => {
     const el = document.getElementById(id);
@@ -4335,12 +4369,14 @@ window.openClientDetailModal = function(clientId) {
             <button class="btn btn-sm btn-secondary" onclick="window.downloadClientContractPdf('${client.id}')" title="Baixar Arquivo PDF" style="font-size: 0.8rem; padding: 0.35rem 0.65rem;">
               <i data-lucide="download"></i> Baixar
             </button>
-            <button class="btn btn-sm btn-secondary" onclick="window.triggerClientContractUpload()" title="Substituir por outro arquivo PDF" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; color: #fbbf24;">
-              <i data-lucide="refresh-cw"></i> Substituir
-            </button>
-            <button class="btn btn-sm btn-secondary" onclick="window.removeClientContractPdf('${client.id}')" title="Remover Contrato" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; color: var(--danger);">
-              <i data-lucide="trash-2"></i>
-            </button>
+            ${isAdmin() ? `
+              <button class="btn btn-sm btn-secondary" onclick="window.triggerClientContractUpload()" title="Substituir por outro arquivo PDF" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; color: #fbbf24;">
+                <i data-lucide="refresh-cw"></i> Substituir
+              </button>
+              <button class="btn btn-sm btn-secondary" onclick="window.removeClientContractPdf('${client.id}')" title="Remover Contrato" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; color: var(--danger);">
+                <i data-lucide="trash-2"></i>
+              </button>
+            ` : ''}
           </div>
         </div>
       ` : `
@@ -4348,11 +4384,13 @@ window.openClientDetailModal = function(clientId) {
           <div style="font-size: 2rem; margin-bottom: 0.35rem;">📄</div>
           <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.25rem;">Nenhum arquivo PDF de contrato anexado</div>
           <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 1rem 0;">
-            Clique no botão abaixo para anexar o contrato assinado em formato PDF para este cliente.
+            ${isAdmin() ? 'Clique no botão abaixo para anexar o contrato assinado em formato PDF para este cliente.' : 'Nenhum contrato anexado pela administração.'}
           </p>
-          <button class="btn btn-primary" onclick="window.triggerClientContractUpload()" style="font-size: 0.85rem; padding: 0.45rem 1.15rem; display: inline-flex; align-items: center; gap: 0.4rem;">
-            <i data-lucide="upload"></i> Inserir / Anexar Contrato PDF
-          </button>
+          ${isAdmin() ? `
+            <button class="btn btn-primary" onclick="window.triggerClientContractUpload()" style="font-size: 0.85rem; padding: 0.45rem 1.15rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+              <i data-lucide="upload"></i> Inserir / Anexar Contrato PDF
+            </button>
+          ` : ''}
         </div>
       `}
     </div>
@@ -4366,7 +4404,7 @@ window.openClientDetailModal = function(clientId) {
   `;
 
   const editBtn = document.getElementById('btn-detail-edit-client');
-  if (editBtn) editBtn.style.display = 'inline-flex';
+  if (editBtn) editBtn.style.display = isAdmin() ? 'inline-flex' : 'none';
 
   const modal = document.getElementById('client-detail-modal');
   if (modal) modal.classList.add('active');
@@ -4375,6 +4413,10 @@ window.openClientDetailModal = function(clientId) {
 
 /* --- CONTRACT PDF ATTACHMENT ENGINE --- */
 window.triggerClientContractUpload = function() {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem anexar contratos.', 'danger');
+    return;
+  }
   const fileInput = document.getElementById('client-contract-file-input');
   if (fileInput) {
     fileInput.value = '';
@@ -4383,6 +4425,10 @@ window.triggerClientContractUpload = function() {
 };
 
 window.handleClientContractFileSelected = function(event) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem enviar contratos.', 'danger');
+    return;
+  }
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
@@ -4487,6 +4533,10 @@ window.downloadClientContractPdf = function(clientId) {
 };
 
 window.removeClientContractPdf = function(clientId) {
+  if (!isAdmin()) {
+    showToast('🔒 Permissão negada: Somente administradores podem remover contratos.', 'danger');
+    return;
+  }
   const targetId = clientId || currentDetailClientId;
   const client = getClientById(targetId);
   if (!client) return;
