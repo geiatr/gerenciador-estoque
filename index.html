@@ -213,6 +213,21 @@
         </div>
 
         <div class="header-actions">
+          <!-- Logged User Identity Display -->
+          <div class="header-user-identity" id="header-user-identity" onclick="window.openSelfProfileModal()" title="Identificação do Usuário Logado • Clique para ver detalhes e perfil" style="display: inline-flex; align-items: center; gap: 0.6rem; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.35); padding: 0.3rem 0.65rem 0.3rem 0.4rem; border-radius: 9999px; cursor: pointer; transition: all 0.2s ease;">
+            <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+              <div class="avatar" id="header-user-avatar" style="width: 28px; height: 28px; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; font-weight: 800; border: 1px solid rgba(255, 255, 255, 0.2);">AD</div>
+              <span class="live-pulse-dot" style="position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; border: 1.5px solid #0f172a;"></span>
+            </div>
+            <div style="display: flex; flex-direction: column; line-height: 1.15; text-align: left;">
+              <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span id="header-user-name" style="font-size: 0.8rem; font-weight: 700; color: #fff;">Administrador</span>
+                <span id="header-user-badge" class="badge badge-primary" style="font-size: 0.625rem; padding: 0.08rem 0.35rem; border-radius: 9999px;">🛡️ Admin</span>
+              </div>
+              <span id="header-user-login" style="font-size: 0.675rem; color: #94a3b8; font-family: monospace;">@admin</span>
+            </div>
+          </div>
+
           <button class="btn btn-sm btn-secondary" id="btn-online-users" onclick="window.openOnlineUsersModal()" title="Ver usuários online em tempo real" style="display: inline-flex; align-items: center; gap: 0.45rem; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.12); color: #34d399; font-size: 0.825rem; padding: 0.4rem 0.75rem; border-radius: var(--radius-md); cursor: pointer;">
             <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
             <span id="online-users-count-badge" style="font-weight: 600;">1 Online</span>
@@ -1513,52 +1528,77 @@
     </div>
   </div>
 
-  <!-- MODAL: SELF PROFILE / CHANGE OWN PASSWORD -->
+  <!-- MODAL: SELF PROFILE / IDENTIFICAÇÃO DO USUÁRIO LOGADO -->
   <div class="modal-backdrop" id="self-profile-modal">
-    <div class="modal-card" style="max-width: 460px;">
+    <div class="modal-card" style="max-width: 500px; width: 95%;">
       <div class="modal-header">
         <div>
-          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-            <i data-lucide="user-cog"></i> Meu Perfil & Senha
+          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; color: #38bdf8;">
+            <i data-lucide="user-check"></i> Identificação do Usuário Logado
           </h3>
           <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
-            Atualize sua senha de acesso
+            Dados da sua conta conectada e segurança
           </p>
         </div>
         <button class="close-btn" onclick="window.closeSelfProfileModal()">&times;</button>
       </div>
 
       <form id="self-profile-form" onsubmit="window.handleSelfProfileSubmit(event)">
-        <div class="modal-body">
-          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; background: rgba(15, 23, 42, 0.4); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
-            <div class="avatar" id="self-modal-avatar" style="width: 46px; height: 46px; font-size: 1.1rem;">AD</div>
-            <div>
-              <div id="self-modal-name" style="font-weight: 700; font-size: 1rem; color: var(--text-main);">-</div>
-              <div id="self-modal-meta" style="font-size: 0.8rem; color: var(--text-muted);">-</div>
+        <div class="modal-body" style="padding: 1.25rem;">
+          
+          <!-- Complete User Identity Card -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.85rem;">
+              <div style="position: relative;">
+                <div class="avatar" id="self-modal-avatar" style="width: 52px; height: 52px; font-size: 1.2rem; background: linear-gradient(135deg, #0284c7, #38bdf8); color: #fff; font-weight: 800; border: 2px solid rgba(255, 255, 255, 0.25);">AD</div>
+                <span class="live-pulse-dot" style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border: 2px solid #0f172a;"></span>
+              </div>
+              <div>
+                <div id="self-modal-name" style="font-weight: 800; font-size: 1.05rem; color: #fff; line-height: 1.2;">Administrador</div>
+                <div id="self-modal-login" style="font-size: 0.8rem; color: #38bdf8; font-family: monospace; margin: 0.15rem 0;">@admin</div>
+                <div id="self-modal-role-badge" style="margin-top: 0.25rem;">
+                  <span class="badge badge-primary" style="font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">🛡️ Administrador Master</span>
+                </div>
+              </div>
             </div>
+
+            <div style="text-align: right; font-size: 0.75rem; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 0.75rem;">
+              <div style="color: #34d399; font-weight: 600; margin-bottom: 0.2rem;">🟢 Conectado Agora</div>
+              <div id="self-modal-login-time" style="color: var(--text-muted);">Sessão Ativa</div>
+            </div>
+          </div>
+
+          <!-- Section: Change Password -->
+          <div style="font-size: 0.85rem; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(251, 191, 36, 0.2); padding-bottom: 0.25rem; display: flex; align-items: center; gap: 0.4rem;">
+            <i data-lucide="key-round" style="width: 15px; height: 15px;"></i> Alterar Senha de Acesso
           </div>
 
           <div class="form-group">
             <label for="self-current-pwd">Senha Atual *</label>
-            <input type="password" id="self-current-pwd" class="form-control" placeholder="Digite sua senha atual..." required>
+            <input type="password" id="self-current-pwd" class="form-control" placeholder="Digite sua senha atual..." required autocomplete="current-password">
           </div>
 
           <div class="form-group">
             <label for="self-new-pwd">Nova Senha *</label>
-            <input type="password" id="self-new-pwd" class="form-control" placeholder="Digite a nova senha desejada..." required minlength="4">
+            <input type="password" id="self-new-pwd" class="form-control" placeholder="Digite a nova senha desejada..." required minlength="4" autocomplete="new-password">
           </div>
 
           <div class="form-group">
             <label for="self-new-pwd-confirm">Confirmar Nova Senha *</label>
-            <input type="password" id="self-new-pwd-confirm" class="form-control" placeholder="Confirme a nova senha..." required minlength="4">
+            <input type="password" id="self-new-pwd-confirm" class="form-control" placeholder="Confirme a nova senha..." required minlength="4" autocomplete="new-password">
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="window.closeSelfProfileModal()">Cancelar</button>
-          <button type="submit" class="btn btn-primary">
-            <i data-lucide="check"></i> Salvar Nova Senha
+        <div class="modal-footer" style="justify-content: space-between;">
+          <button type="button" class="btn btn-secondary" onclick="window.handleLogout()" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4);" title="Encerrar sessão e sair">
+            <i data-lucide="log-out"></i> Sair da Conta
           </button>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="btn btn-secondary" onclick="window.closeSelfProfileModal()">Fechar</button>
+            <button type="submit" class="btn btn-primary">
+              <i data-lucide="check"></i> Salvar Senha
+            </button>
+          </div>
         </div>
       </form>
     </div>
