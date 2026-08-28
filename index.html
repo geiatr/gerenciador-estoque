@@ -125,11 +125,17 @@
 
   <div class="app-container" style="display: none;">
     
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="window.toggleMobileSidebar(false)"></div>
+
     <!-- Sidebar Navigation -->
     <aside class="sidebar" id="main-sidebar">
       <div class="brand" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.65rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
-        <div style="background: #ffffff; padding: 6px 10px; border-radius: var(--radius-md); width: 100%; display: flex; align-items: center; justify-content: center;">
-          <img src="./assets/logo.png" alt="IA TECNOLOGIA" style="height: 32px; max-width: 100%; object-fit: contain;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="background: #ffffff; padding: 6px 10px; border-radius: var(--radius-md); width: 100%; display: flex; align-items: center; justify-content: center;">
+            <img src="./assets/logo.png" alt="IA TECNOLOGIA" style="height: 32px; max-width: 100%; object-fit: contain;">
+          </div>
+          <button class="close-btn mobile-only-close" onclick="window.toggleMobileSidebar(false)" style="display: none; font-size: 1.5rem; color: #fff; margin-left: 0.5rem;">&times;</button>
         </div>
         <div class="brand-text">
           <h1 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin: 0;">StockMaster</h1>
@@ -210,9 +216,14 @@
       
       <!-- Top Header Bar -->
       <header class="top-header">
-        <div class="search-box">
-          <i data-lucide="search"></i>
-          <input type="text" id="global-search" placeholder="Buscar produtos por nome, SKU ou categoria...">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button class="icon-btn" id="btn-mobile-menu" onclick="window.toggleMobileSidebar()" style="display: none; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border); color: #fff;" title="Menu Lateral de Navegação">
+            <i data-lucide="menu"></i>
+          </button>
+          <div class="search-box">
+            <i data-lucide="search"></i>
+            <input type="text" id="global-search" placeholder="Buscar produtos por nome, SKU ou categoria...">
+          </div>
         </div>
 
         <div class="header-actions">
@@ -747,7 +758,7 @@
               <button class="btn btn-secondary" onclick="window.exportClientsExcel()" title="Exportar clientes para arquivo Excel / Planilha">
                 <i data-lucide="download"></i> Exportar
               </button>
-              <button class="btn btn-primary" id="btn-add-client" onclick="window.openAddClientModal()">
+              <button class="btn btn-primary admin-only" id="btn-add-client" onclick="window.openAddClientModal()">
                 <i data-lucide="building-2"></i> + Novo Cliente
               </button>
             </div>
