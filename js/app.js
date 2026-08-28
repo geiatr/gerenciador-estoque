@@ -891,15 +891,37 @@ function updateUserSidebarUI(user) {
   const roleEl = document.getElementById('current-user-role');
   const avatarEl = document.getElementById('current-user-avatar');
 
+  const headerNameEl = document.getElementById('header-user-name');
+  const headerLoginEl = document.getElementById('header-user-login');
+  const headerRoleBadge = document.getElementById('header-user-badge');
+  const headerAvatarEl = document.getElementById('header-user-avatar');
+
+  const isAdminUser = user.role === 'admin' || user.username === 'admin';
+  const roleMap = { admin: 'Administrador Master', operator: 'Operador de Estoque', viewer: 'Usuário (Consulta)' };
+  const roleText = roleMap[user.role] || (isAdminUser ? 'Administrador' : 'Usuário');
+
+  const parts = (user.name || '').trim().split(' ');
+  const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'AD').slice(0, 2).toUpperCase();
+
+  // Sidebar UI
   if (nameEl) nameEl.textContent = user.name;
-  if (roleEl) {
-    const roleMap = { admin: 'Administrador', operator: 'Operador de Estoque', viewer: 'Visualizador' };
-    roleEl.textContent = roleMap[user.role] || user.role;
-  }
-  if (avatarEl) {
-    const parts = (user.name || '').trim().split(' ');
-    const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'AD').slice(0, 2).toUpperCase();
-    avatarEl.textContent = initials;
+  if (roleEl) roleEl.textContent = roleText;
+  if (avatarEl) avatarEl.textContent = initials;
+
+  // Top Header User Identity Chip
+  if (headerNameEl) headerNameEl.textContent = user.name;
+  if (headerLoginEl) headerLoginEl.textContent = `@${user.username || 'usuario'}`;
+  if (headerAvatarEl) headerAvatarEl.textContent = initials;
+  if (headerRoleBadge) {
+    if (isAdminUser) {
+      headerRoleBadge.className = 'badge badge-primary';
+      headerRoleBadge.innerHTML = '🛡️ Admin Master';
+      headerRoleBadge.style.background = 'linear-gradient(135deg, #0284c7, #0369a1)';
+    } else {
+      headerRoleBadge.className = 'badge badge-info';
+      headerRoleBadge.innerHTML = '👁️ Consulta';
+      headerRoleBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+    }
   }
 }
 
@@ -1429,6 +1451,7 @@ function setupNavigation() {
 }
 
 function renderApp() {
+  updateUserSidebarUI(getCurrentUser());
   updateGlobalStats();
   applyPermissionVisibility();
   
@@ -3505,6 +3528,8 @@ window.renderUsersTable = function() {
     viewer: '<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">👁️ Modo Consulta</span>'
   };
 
+  const currentUser = getCurrentUser();
+
   tbody.innerHTML = filtered.map(u => {
     const parts = (u.name || '').trim().split(' ');
     const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'US').slice(0, 2).toUpperCase();
@@ -3513,6 +3538,7 @@ window.renderUsersTable = function() {
     // Find active session for this user
     const userSession = onlineSessions.find(s => (s.username || '').toLowerCase() === (u.username || '').toLowerCase());
     const isOnline = !!userSession;
+    const isMe = currentUser && (currentUser.id === u.id || (currentUser.username && currentUser.username.toLowerCase() === (u.username || '').toLowerCase()));
 
     const onlineStatusHtml = isOnline
       ? `
@@ -3528,7 +3554,7 @@ window.renderUsersTable = function() {
       : '<span style="color: var(--text-muted); font-size: 0.75rem;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#64748b;margin-right:4px;"></span> Desconectado</span>';
 
     return `
-      <tr>
+      <tr style="${isMe ? 'background: rgba(56, 189, 248, 0.05);' : ''}">
         <td>
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <div style="position: relative;">
@@ -3536,7 +3562,10 @@ window.renderUsersTable = function() {
               ${isOnline ? '<span class="live-pulse-dot" style="position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 2px solid #0f172a;"></span>' : ''}
             </div>
             <div>
-              <strong style="color: var(--text-main); font-size: 0.9rem;">${u.name}</strong>
+              <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                <strong style="color: var(--text-main); font-size: 0.9rem;">${u.name}</strong>
+                ${isMe ? '<span class="badge" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 9999px; border: 1px solid rgba(56, 189, 248, 0.35);">👤 VOCÊ</span>' : ''}
+              </div>
               <div style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id}</div>
             </div>
           </div>
@@ -3810,7 +3839,7 @@ window.deleteUser = function(userId) {
   renderUsersView();
 };
 
-/* Self Profile Modal */
+/* Self Profile Modal / Identificação do Usuário Logado */
 window.openSelfProfileModal = function() {
   const user = getCurrentUser();
   if (!user) return;
@@ -3818,13 +3847,31 @@ window.openSelfProfileModal = function() {
   const fullUser = getUserById(user.id) || user;
   const modal = document.getElementById('self-profile-modal');
   const nameEl = document.getElementById('self-modal-name');
-  const metaEl = document.getElementById('self-modal-meta');
+  const loginEl = document.getElementById('self-modal-login');
+  const roleBadgeEl = document.getElementById('self-modal-role-badge');
   const avatarEl = document.getElementById('self-modal-avatar');
+  const loginTimeEl = document.getElementById('self-modal-login-time');
   const form = document.getElementById('self-profile-form');
 
   if (form) form.reset();
   if (nameEl) nameEl.textContent = fullUser.name;
-  if (metaEl) metaEl.textContent = `@${fullUser.username} • Perfil: ${fullUser.role === 'admin' ? 'Administrador' : fullUser.role}`;
+  if (loginEl) loginEl.textContent = `@${fullUser.username || 'usuario'}`;
+
+  const isAdminUser = fullUser.role === 'admin' || fullUser.username === 'admin';
+  if (roleBadgeEl) {
+    if (isAdminUser) {
+      roleBadgeEl.innerHTML = '<span class="badge badge-primary" style="font-size: 0.725rem; padding: 0.2rem 0.6rem; border-radius: 9999px; background: linear-gradient(135deg, #0284c7, #0369a1);">🛡️ Administrador Master</span>';
+    } else {
+      roleBadgeEl.innerHTML = '<span class="badge badge-info" style="font-size: 0.725rem; padding: 0.2rem 0.6rem; border-radius: 9999px; background: rgba(56, 189, 248, 0.2); color: #38bdf8;">👁️ Usuário (Modo Consulta)</span>';
+    }
+  }
+
+  const rawLoginTime = sessionStorage.getItem('stockmaster_login_time');
+  const loginDateStr = rawLoginTime ? new Date(rawLoginTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Agora';
+  if (loginTimeEl) {
+    loginTimeEl.textContent = `Entrada às ${loginDateStr}`;
+  }
+
   if (avatarEl) {
     const parts = (fullUser.name || '').trim().split(' ');
     const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] || 'AD').slice(0, 2).toUpperCase();
